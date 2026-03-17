@@ -1,0 +1,25 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const poll_controller_1 = require("../controllers/poll.controller");
+const auth_middleware_1 = require("../middleware/auth.middleware");
+const poll_validate_middleware_1 = require("../middleware/poll.validate.middleware");
+const poll_validation_1 = require("../validations/poll.validation");
+const admin_middleware_1 = require("../middleware/admin.middleware");
+const router = (0, express_1.Router)();
+router.get('/', auth_middleware_1.authenticateToken, poll_controller_1.getPolls);
+router.post('/', auth_middleware_1.authenticateToken, admin_middleware_1.isAdmin, (0, poll_validate_middleware_1.validatePollRequest)(poll_validation_1.createPollSchema), poll_controller_1.createPoll);
+router.post('/create', auth_middleware_1.authenticateToken, admin_middleware_1.isAdmin, (0, poll_validate_middleware_1.validatePollRequest)(poll_validation_1.quickCreatePollSchema), poll_controller_1.quickCreatePoll);
+router.post('/join', auth_middleware_1.authenticateToken, (0, poll_validate_middleware_1.validatePollRequest)(poll_validation_1.joinPollSchema), poll_controller_1.joinPoll);
+router.post('/:pollId/response', auth_middleware_1.authenticateToken, (0, poll_validate_middleware_1.validatePollRequest)(poll_validation_1.submitPollResponseSchema), poll_controller_1.submitResponse);
+router.get('/:pollId', auth_middleware_1.authenticateToken, poll_controller_1.getPollById);
+router.get('/:pollId/results', auth_middleware_1.authenticateToken, poll_controller_1.getPollResults);
+router.get('/:pollId/results', auth_middleware_1.authenticateToken, poll_controller_1.getSessionPollResults);
+router.get('/:pollId/questions/:questionId/results', auth_middleware_1.authenticateToken, poll_controller_1.getSessionPollQuestionResults);
+router.get('/standalone/:pollId/results', auth_middleware_1.authenticateToken, poll_controller_1.getStandalonePollResults);
+router.get('/standalone/:pollId/questions/:questionId/results', auth_middleware_1.authenticateToken, poll_controller_1.getStandalonePollQuestionResults);
+router.post('/question', auth_middleware_1.authenticateToken, admin_middleware_1.isAdmin, (0, poll_validate_middleware_1.validatePollRequest)(poll_validation_1.addPollQuestionSchema), poll_controller_1.addPollQuestion);
+router.post('/:pollId/end-question', auth_middleware_1.authenticateToken, admin_middleware_1.isAdmin, poll_controller_1.endPollQuestion);
+router.post('/standalone', auth_middleware_1.authenticateToken, admin_middleware_1.isAdmin, (0, poll_validate_middleware_1.validatePollRequest)(poll_validation_1.createStandalonePollSchema), poll_controller_1.createStandalonePoll);
+exports.default = router;
+//# sourceMappingURL=poll.routes.js.map

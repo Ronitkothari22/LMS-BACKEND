@@ -1,0 +1,120 @@
+import { Router } from 'express';
+import * as sessionController from '../controllers/session.controller';
+import { authenticateToken } from '../middleware/auth.middleware';
+import { isAdmin } from '../middleware/admin.middleware';
+import { validateRequest } from '../middleware/validate.middleware';
+import { upload } from '../middleware/upload.middleware';
+import {
+  createSessionSchema,
+  updateSessionSchema,
+  joinSessionSchema,
+  toggleSessionStatusSchema,
+  getSessionsSchema,
+  getSessionByIdSchema,
+  bulkSessionInviteSchema,
+  addEmailToSessionSchema,
+  getSessionQuizScoringSchema,
+  assignUsersToSessionSchema,
+  deleteSessionSchema,
+} from '../validations/session.validation';
+import { RequestHandler } from 'express';
+
+const router = Router();
+
+// Create new session (admin only)
+router.post(
+  '/',
+  authenticateToken as RequestHandler,
+  isAdmin as RequestHandler,
+  validateRequest(createSessionSchema),
+  sessionController.createSession,
+);
+
+// Update session details (admin only)
+router.put(
+  '/:sessionId',
+  authenticateToken as RequestHandler,
+  isAdmin as RequestHandler,
+  validateRequest(updateSessionSchema),
+  sessionController.updateSession,
+);
+
+// Join a session using joining code
+router.post(
+  '/join',
+  authenticateToken as RequestHandler,
+  validateRequest(joinSessionSchema),
+  sessionController.joinSession,
+);
+
+// Toggle session active status (admin only)
+router.patch(
+  '/:sessionId',
+  authenticateToken as RequestHandler,
+  isAdmin as RequestHandler,
+  validateRequest(toggleSessionStatusSchema),
+  sessionController.toggleSessionStatus,
+);
+
+// Bulk invite users to session from CSV/Excel (admin only)
+router.post(
+  '/bulk-invite',
+  authenticateToken as RequestHandler,
+  isAdmin as RequestHandler,
+  upload.single('file'),
+  validateRequest(bulkSessionInviteSchema),
+  sessionController.bulkSessionInvite,
+);
+
+// Add single email to session invite list (admin or session creator)
+router.post(
+  '/:sessionId/invite',
+  authenticateToken as RequestHandler,
+  validateRequest(addEmailToSessionSchema),
+  sessionController.addEmailToSession,
+);
+
+// Assign users directly to a session (admin or session creator)
+router.post(
+  '/:sessionId/assign',
+  authenticateToken as RequestHandler,
+  validateRequest(assignUsersToSessionSchema),
+  sessionController.assignUsersToSession,
+);
+
+// Delete a session (admin or session creator)
+router.delete(
+  '/:sessionId',
+  authenticateToken as RequestHandler,
+  validateRequest(deleteSessionSchema),
+  sessionController.deleteSession,
+);
+
+// Get all sessions with pagination (accessible to all authenticated users)
+router.get(
+  '/',
+  authenticateToken as RequestHandler,
+  validateRequest(getSessionsSchema),
+  sessionController.getSessions,
+);
+
+// Get user's participated sessions - Must appear BEFORE the :sessionId route
+router.get('/user', authenticateToken as RequestHandler, sessionController.getUserSessions);
+
+// Get session quiz scoring details - Must appear BEFORE the :sessionId route
+router.get(
+  '/:sessionId/quiz-scoring',
+  authenticateToken as RequestHandler,
+  validateRequest(getSessionQuizScoringSchema),
+  sessionController.getSessionQuizScoring,
+);
+
+// Get session details by ID
+router.get(
+  '/:sessionId',
+  authenticateToken as RequestHandler,
+  validateRequest(getSessionByIdSchema),
+  sessionController.getSessionById,
+);
+
+export default router;

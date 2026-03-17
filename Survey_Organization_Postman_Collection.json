@@ -1,0 +1,411 @@
+{
+  "info": {
+    "name": "Survey & Organization API",
+    "description": "Essential endpoints for survey and organization management",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{auth_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://your-backend-domain.com/api"
+    },
+    {
+      "key": "session_id",
+      "value": "session-uuid-here"
+    },
+    {
+      "key": "org_id",
+      "value": "org-uuid-12345"
+    },
+    {
+      "key": "dept_id",
+      "value": "dept-uuid-eng-001"
+    },
+    {
+      "key": "survey_id",
+      "value": "survey-uuid-satisfaction-001"
+    }
+  ],
+  "item": [
+    {
+      "name": "🏢 Organization Management",
+      "item": [
+        {
+          "name": "1. Create Organization",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"{{session_id}}\",\n  \"name\": \"Tech Solutions Inc\",\n  \"description\": \"A leading technology solutions company\",\n  \"settings\": {\n    \"timezone\": \"UTC\",\n    \"workingHours\": \"9AM-5PM\"\n  }\n}\n\n// REQUIRED: sessionId, name\n// OPTIONAL: description, settings"
+            },
+            "url": {
+              "raw": "{{base_url}}/organization/organizations",
+              "host": ["{{base_url}}"],
+              "path": ["organization", "organizations"]
+            }
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "body": "{\n  \"success\": true,\n  \"message\": \"Organization created successfully\",\n  \"data\": {\n    \"id\": \"org-uuid-12345\",\n    \"sessionId\": \"session-uuid-here\",\n    \"name\": \"Tech Solutions Inc\",\n    \"description\": \"A leading technology solutions company\",\n    \"settings\": {...},\n    \"createdAt\": \"2024-01-15T10:30:00Z\",\n    \"departments\": []\n  }\n}",
+              "code": 201
+            }
+          ]
+        },
+        {
+          "name": "2. Get Organizations by Session",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/organization/sessions/{{session_id}}/organizations",
+              "host": ["{{base_url}}"],
+              "path": ["organization", "sessions", "{{session_id}}", "organizations"]
+            }
+          }
+        },
+        {
+          "name": "3. Create Department",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"{{org_id}}\",\n  \"name\": \"Engineering Department\",\n  \"description\": \"Software development and technical operations\",\n  \"parentDepartmentId\": null,\n  \"departmentHeadId\": \"user-uuid-head\"\n}\n\n// REQUIRED: organizationId, name\n// OPTIONAL: description, parentDepartmentId, departmentHeadId"
+            },
+            "url": {
+              "raw": "{{base_url}}/organization/departments",
+              "host": ["{{base_url}}"],
+              "path": ["organization", "departments"]
+            }
+          }
+        },
+        {
+          "name": "4. Create Team (Optional)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"departmentId\": \"{{dept_id}}\",\n  \"name\": \"Frontend Development Team\",\n  \"description\": \"React and Next.js development team\",\n  \"teamLeadId\": \"user-uuid-lead\"\n}\n\n// REQUIRED: departmentId, name\n// OPTIONAL: description, teamLeadId\n// NOTE: This step is OPTIONAL - you can assign users directly to departments"
+            },
+            "url": {
+              "raw": "{{base_url}}/organization/teams",
+              "host": ["{{base_url}}"],
+              "path": ["organization", "teams"]
+            }
+          }
+        },
+        {
+          "name": "5. Assign User to Department (Without Team)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"user-uuid-employee\",\n  \"departmentId\": \"{{dept_id}}\",\n  \"role\": \"USER\"\n}\n\n// REQUIRED: userId, departmentId, role\n// OPTIONAL: teamId (can be null - assigns directly to department)\n// This works WITHOUT creating a team first!"
+            },
+            "url": {
+              "raw": "{{base_url}}/organization/user-assignments",
+              "host": ["{{base_url}}"],
+              "path": ["organization", "user-assignments"]
+            }
+          }
+        },
+        {
+          "name": "6. Assign User to Department + Team",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"user-uuid-employee\",\n  \"departmentId\": \"{{dept_id}}\",\n  \"teamId\": \"team-uuid-frontend-001\",\n  \"role\": \"USER\"\n}\n\n// REQUIRED: userId, departmentId, role\n// OPTIONAL: teamId (if you want to assign to specific team within department)"
+            },
+            "url": {
+              "raw": "{{base_url}}/organization/user-assignments",
+              "host": ["{{base_url}}"],
+              "path": ["organization", "user-assignments"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📊 Survey Management",
+      "item": [
+        {
+          "name": "1. Create Survey",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"{{session_id}}\",\n  \"title\": \"Employee Satisfaction Survey Q1 2024\",\n  \"description\": \"Quarterly assessment of employee satisfaction\",\n  \"startDate\": \"2024-02-01T00:00:00Z\",\n  \"endDate\": \"2024-02-15T23:59:59Z\",\n  \"isAnonymous\": true,\n  \"allowMultipleResponses\": false,\n  \"isOptional\": true,\n  \"settings\": {\n    \"reminderEnabled\": true,\n    \"showProgress\": true\n  }\n}\n\n// REQUIRED: sessionId, title\n// OPTIONAL: description, startDate, endDate, isAnonymous, allowMultipleResponses, isOptional, settings"
+            },
+            "url": {
+              "raw": "{{base_url}}/survey/surveys",
+              "host": ["{{base_url}}"],
+              "path": ["survey", "surveys"]
+            }
+          }
+        },
+        {
+          "name": "2. Add Question to Survey",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"surveyId\": \"{{survey_id}}\",\n  \"questionText\": \"How satisfied are you with your work environment?\",\n  \"questionType\": \"RATING_SCALE\",\n  \"surveyType\": \"SATISFACTION\",\n  \"options\": {\n    \"scale\": \"1-5\",\n    \"labels\": {\n      \"1\": \"Very Dissatisfied\",\n      \"2\": \"Dissatisfied\",\n      \"3\": \"Neutral\",\n      \"4\": \"Satisfied\",\n      \"5\": \"Very Satisfied\"\n    }\n  },\n  \"isRequired\": true,\n  \"orderIndex\": 1\n}\n\n// REQUIRED: surveyId, questionText, questionType, surveyType, orderIndex\n// OPTIONAL: options, validationRules, isRequired\n// Question Types: MULTIPLE_CHOICE, RATING_SCALE, TEXT, BEHAVIORAL, MATRIX\n// Survey Types: BEHAVIORAL, SATISFACTION, ORGANIZATIONAL, CUSTOM"
+            },
+            "url": {
+              "raw": "{{base_url}}/survey/survey-questions",
+              "host": ["{{base_url}}"],
+              "path": ["survey", "survey-questions"]
+            }
+          }
+        },
+        {
+          "name": "3. Assign Survey to Department",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"surveyId\": \"{{survey_id}}\",\n  \"assignedToType\": \"DEPARTMENT\",\n  \"assignedToId\": \"{{dept_id}}\",\n  \"deadline\": \"2024-02-14T23:59:59Z\",\n  \"reminderSchedule\": {\n    \"enabled\": true,\n    \"frequency\": \"weekly\"\n  }\n}\n\n// REQUIRED: surveyId, assignedToType, assignedToId\n// OPTIONAL: deadline, reminderSchedule\n// Assignment Types: DEPARTMENT, TEAM, INDIVIDUAL"
+            },
+            "url": {
+              "raw": "{{base_url}}/survey/survey-assignments",
+              "host": ["{{base_url}}"],
+              "path": ["survey", "survey-assignments"]
+            }
+          }
+        },
+        {
+          "name": "4. Assign Survey to Individual User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"surveyId\": \"{{survey_id}}\",\n  \"assignedToType\": \"INDIVIDUAL\",\n  \"assignedToId\": \"user-uuid-employee\",\n  \"deadline\": \"2024-02-14T23:59:59Z\"\n}\n\n// REQUIRED: surveyId, assignedToType, assignedToId\n// OPTIONAL: deadline, reminderSchedule"
+            },
+            "url": {
+              "raw": "{{base_url}}/survey/survey-assignments",
+              "host": ["{{base_url}}"],
+              "path": ["survey", "survey-assignments"]
+            }
+          }
+        },
+        {
+          "name": "5. Submit Survey Response",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"surveyId\": \"{{survey_id}}\",\n  \"responses\": [\n    {\n      \"questionId\": \"question-uuid-001\",\n      \"responseValue\": 4\n    },\n    {\n      \"questionId\": \"question-uuid-002\",\n      \"responseValue\": \"I enjoy working here!\"\n    }\n  ]\n}\n\n// REQUIRED: surveyId, responses array\n// Each response needs: questionId, responseValue"
+            },
+            "url": {
+              "raw": "{{base_url}}/survey/survey-responses",
+              "host": ["{{base_url}}"],
+              "path": ["survey", "survey-responses"]
+            }
+          }
+        },
+        {
+          "name": "6. Get Survey Analytics",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/survey/surveys/{{survey_id}}/analytics",
+              "host": ["{{base_url}}"],
+              "path": ["survey", "surveys", "{{survey_id}}", "analytics"]
+            }
+          }
+        },
+        {
+          "name": "7. Get Surveys by Session",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/survey/sessions/{{session_id}}/surveys",
+              "host": ["{{base_url}}"],
+              "path": ["survey", "sessions", "{{session_id}}", "surveys"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📋 Quick Workflow Test",
+      "item": [
+        {
+          "name": "STEP 1: Create Organization",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"{{session_id}}\",\n  \"name\": \"My Company\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/organization/organizations",
+              "host": ["{{base_url}}"],
+              "path": ["organization", "organizations"]
+            }
+          }
+        },
+        {
+          "name": "STEP 2: Create Department",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"{{org_id}}\",\n  \"name\": \"Engineering\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/organization/departments",
+              "host": ["{{base_url}}"],
+              "path": ["organization", "departments"]
+            }
+          }
+        },
+        {
+          "name": "STEP 3: Assign User to Department (No Team)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"user-uuid-employee\",\n  \"departmentId\": \"{{dept_id}}\",\n  \"role\": \"USER\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/organization/user-assignments",
+              "host": ["{{base_url}}"],
+              "path": ["organization", "user-assignments"]
+            }
+          }
+        },
+        {
+          "name": "STEP 4: Create Survey",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"{{session_id}}\",\n  \"title\": \"Quick Satisfaction Survey\",\n  \"type\": \"SATISFACTION\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/survey/surveys",
+              "host": ["{{base_url}}"],
+              "path": ["survey", "surveys"]
+            }
+          }
+        },
+        {
+          "name": "STEP 5: Assign Survey to Department",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"surveyId\": \"{{survey_id}}\",\n  \"assignedToType\": \"DEPARTMENT\",\n  \"assignedToId\": \"{{dept_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/survey/survey-assignments",
+              "host": ["{{base_url}}"],
+              "path": ["survey", "survey-assignments"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+} 

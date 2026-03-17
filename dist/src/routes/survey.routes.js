@@ -1,0 +1,26 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const survey_controller_1 = require("../controllers/survey.controller");
+const auth_middleware_1 = require("../middleware/auth.middleware");
+const router = (0, express_1.Router)();
+const surveyController = new survey_controller_1.SurveyController();
+router.post('/surveys', auth_middleware_1.authenticateToken, surveyController.createSurvey.bind(surveyController));
+router.get('/sessions/:sessionId/surveys', auth_middleware_1.authenticateToken, surveyController.getSurveysBySession.bind(surveyController));
+router.get('/surveys/:id', auth_middleware_1.authenticateToken, surveyController.getSurveyById.bind(surveyController));
+router.put('/surveys/:id', auth_middleware_1.authenticateToken, surveyController.updateSurvey.bind(surveyController));
+router.delete('/surveys/:id', auth_middleware_1.authenticateToken, surveyController.deleteSurvey.bind(surveyController));
+router.post('/survey-questions', auth_middleware_1.authenticateToken, surveyController.addQuestionToSurvey.bind(surveyController));
+router.put('/survey-questions/:id', auth_middleware_1.authenticateToken, surveyController.updateSurveyQuestion.bind(surveyController));
+router.delete('/survey-questions/:id', auth_middleware_1.authenticateToken, surveyController.deleteSurveyQuestion.bind(surveyController));
+router.post('/survey-assignments', auth_middleware_1.authenticateToken, surveyController.assignSurvey.bind(surveyController));
+router.get('/surveys/:surveyId/assignments', auth_middleware_1.authenticateToken, surveyController.getSurveyAssignments.bind(surveyController));
+router.delete('/survey-assignments/:id', auth_middleware_1.authenticateToken, surveyController.removeAssignment.bind(surveyController));
+router.post('/survey-responses', auth_middleware_1.authenticateToken, surveyController.submitSurveyResponse.bind(surveyController));
+router.get('/users/:userId/survey-responses', auth_middleware_1.authenticateToken, surveyController.getUserSurveyResponses.bind(surveyController));
+router.get('/surveys/:surveyId/analytics', auth_middleware_1.authenticateToken, surveyController.getSurveyAnalytics.bind(surveyController));
+router.get('/surveys/:surveyId/department-breakdown', auth_middleware_1.authenticateToken, surveyController.getSurveyDepartmentBreakdown.bind(surveyController));
+router.get('/departments/:departmentId/survey-analytics', auth_middleware_1.authenticateToken, surveyController.getDepartmentSurveyAnalytics.bind(surveyController));
+router.get('/departments/:departmentId/question-analytics', auth_middleware_1.authenticateToken, surveyController.getDepartmentQuestionAnalytics.bind(surveyController));
+exports.default = router;
+//# sourceMappingURL=survey.routes.js.map

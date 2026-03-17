@@ -1,0 +1,366 @@
+{
+  "info": {
+    "name": "Team Point Awards API",
+    "description": "Collection for testing team point awards functionality",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "YOUR_JWT_TOKEN_HERE",
+      "type": "string"
+    },
+    {
+      "key": "sessionId",
+      "value": "550e8400-e29b-41d4-a716-446655440000",
+      "type": "string"
+    },
+    {
+      "key": "teamId",
+      "value": "660e8400-e29b-41d4-a716-446655440001",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"your_password\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Teams Management",
+      "item": [
+        {
+          "name": "Get All Teams in Session",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sessions/{{sessionId}}/teams",
+              "host": ["{{baseUrl}}"],
+              "path": ["sessions", "{{sessionId}}", "teams"]
+            }
+          }
+        },
+        {
+          "name": "Get Team by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sessions/{{sessionId}}/teams/{{teamId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["sessions", "{{sessionId}}", "teams", "{{teamId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Team Leaderboard (Enhanced)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sessions/{{sessionId}}/teams/leaderboard?sortBy=totalScore&order=desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["sessions", "{{sessionId}}", "teams", "leaderboard"],
+              "query": [
+                {
+                  "key": "sortBy",
+                  "value": "totalScore"
+                },
+                {
+                  "key": "order",
+                  "value": "desc"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Point Awards (NEW)",
+      "item": [
+        {
+          "name": "Award Points - Innovation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"points\": 100,\n  \"reason\": \"Excellent teamwork and innovative solution during hackathon\",\n  \"category\": \"Innovation\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sessions/{{sessionId}}/teams/{{teamId}}/award-points",
+              "host": ["{{baseUrl}}"],
+              "path": ["sessions", "{{sessionId}}", "teams", "{{teamId}}", "award-points"]
+            }
+          }
+        },
+        {
+          "name": "Award Points - Participation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"points\": 25,\n  \"reason\": \"Active participation throughout the session\",\n  \"category\": \"Participation\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sessions/{{sessionId}}/teams/{{teamId}}/award-points",
+              "host": ["{{baseUrl}}"],
+              "path": ["sessions", "{{sessionId}}", "teams", "{{teamId}}", "award-points"]
+            }
+          }
+        },
+        {
+          "name": "Award Points - Leadership",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"points\": 75,\n  \"reason\": \"Outstanding leadership and team coordination\",\n  \"category\": \"Leadership\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sessions/{{sessionId}}/teams/{{teamId}}/award-points",
+              "host": ["{{baseUrl}}"],
+              "path": ["sessions", "{{sessionId}}", "teams", "{{teamId}}", "award-points"]
+            }
+          }
+        },
+        {
+          "name": "Award Points - Penalty (Negative)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"points\": -20,\n  \"reason\": \"Late submission beyond deadline\",\n  \"category\": \"Penalty\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sessions/{{sessionId}}/teams/{{teamId}}/award-points",
+              "host": ["{{baseUrl}}"],
+              "path": ["sessions", "{{sessionId}}", "teams", "{{teamId}}", "award-points"]
+            }
+          }
+        },
+        {
+          "name": "Award Points - Simple (No Category)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"points\": 50,\n  \"reason\": \"Great presentation and demo\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sessions/{{sessionId}}/teams/{{teamId}}/award-points",
+              "host": ["{{baseUrl}}"],
+              "path": ["sessions", "{{sessionId}}", "teams", "{{teamId}}", "award-points"]
+            }
+          }
+        },
+        {
+          "name": "Get Team Point Awards History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sessions/{{sessionId}}/teams/{{teamId}}/point-awards?limit=20&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["sessions", "{{sessionId}}", "teams", "{{teamId}}", "point-awards"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Leaderboard Variations",
+      "item": [
+        {
+          "name": "Leaderboard - Total Score (Default)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sessions/{{sessionId}}/teams/leaderboard?sortBy=totalScore&order=desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["sessions", "{{sessionId}}", "teams", "leaderboard"],
+              "query": [
+                {
+                  "key": "sortBy",
+                  "value": "totalScore"
+                },
+                {
+                  "key": "order",
+                  "value": "desc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Leaderboard - Quiz Score Only",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sessions/{{sessionId}}/teams/leaderboard?sortBy=quizScore&order=desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["sessions", "{{sessionId}}", "teams", "leaderboard"],
+              "query": [
+                {
+                  "key": "sortBy",
+                  "value": "quizScore"
+                },
+                {
+                  "key": "order",
+                  "value": "desc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Leaderboard - Total XP",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sessions/{{sessionId}}/teams/leaderboard?sortBy=totalXP&order=desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["sessions", "{{sessionId}}", "teams", "leaderboard"],
+              "query": [
+                {
+                  "key": "sortBy",
+                  "value": "totalXP"
+                },
+                {
+                  "key": "order",
+                  "value": "desc"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+} 

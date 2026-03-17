@@ -1,0 +1,194 @@
+{
+  "info": {
+    "name": "Feedback Module API",
+    "description": "Complete API collection for the Feedback Module with smiley-based rating system",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Create Feedback Form",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "description": "Admin JWT token required"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Session Feedback Form\",\n  \"description\": \"Please provide your feedback about this session\",\n  \"isAnonymous\": false,\n  \"questions\": [\n    {\n      \"question\": \"How would you rate the overall session quality?\",\n      \"type\": \"SMILEY_SCALE\",\n      \"isRequired\": true\n    },\n    {\n      \"question\": \"How engaging was the presenter?\",\n      \"type\": \"SMILEY_SCALE\",\n      \"isRequired\": true\n    },\n    {\n      \"question\": \"How clear was the content delivery?\",\n      \"type\": \"SMILEY_SCALE\",\n      \"isRequired\": true\n    },\n    {\n      \"question\": \"Would you recommend this session to others?\",\n      \"type\": \"SMILEY_SCALE\",\n      \"isRequired\": true\n    },\n    {\n      \"question\": \"Any additional comments or suggestions?\",\n      \"type\": \"TEXT\",\n      \"isRequired\": false\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/feedback/{{session_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["feedback", "{{session_id}}"]
+        },
+        "description": "Create a feedback form for a session. Only admins can create feedback forms."
+      }
+    },
+    {
+      "name": "2. Get Feedback Form",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{user_token}}",
+            "description": "User JWT token required"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/feedback/{{session_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["feedback", "{{session_id}}"]
+        },
+        "description": "Get feedback form for a session. Available to session participants and admins."
+      }
+    },
+    {
+      "name": "3. Submit Feedback Response",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{user_token}}",
+            "description": "User JWT token required"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"responses\": [\n    {\n      \"questionId\": \"{{question_1_id}}\",\n      \"rating\": \"EXCELLENT\"\n    },\n    {\n      \"questionId\": \"{{question_2_id}}\",\n      \"rating\": \"GOOD\"\n    },\n    {\n      \"questionId\": \"{{question_3_id}}\",\n      \"rating\": \"AVERAGE\"\n    },\n    {\n      \"questionId\": \"{{question_4_id}}\",\n      \"rating\": \"GOOD\"\n    },\n    {\n      \"questionId\": \"{{question_5_id}}\",\n      \"textAnswer\": \"Great session! The content was very informative and well-structured. Would love to see more practical examples in future sessions.\"\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/feedback/{{session_id}}/submit",
+          "host": ["{{base_url}}"],
+          "path": ["feedback", "{{session_id}}", "submit"]
+        },
+        "description": "Submit feedback responses. Available rating values: VERY_POOR, POOR, AVERAGE, GOOD, EXCELLENT"
+      }
+    },
+    {
+      "name": "4. Get Feedback Results",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "description": "Admin JWT token required"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/feedback/{{session_id}}/results",
+          "host": ["{{base_url}}"],
+          "path": ["feedback", "{{session_id}}", "results"]
+        },
+        "description": "Get feedback results and analytics. Only admins can view results."
+      }
+    },
+    {
+      "name": "5. Update Feedback Form",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "description": "Admin JWT token required"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Updated Session Feedback Form\",\n  \"description\": \"Updated description for the feedback form\",\n  \"isActive\": true,\n  \"isAnonymous\": true\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/feedback/{{session_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["feedback", "{{session_id}}"]
+        },
+        "description": "Update feedback form properties. Only admins can update feedback forms."
+      }
+    },
+    {
+      "name": "6. Delete Feedback Form",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "description": "Admin JWT token required"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/feedback/{{session_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["feedback", "{{session_id}}"]
+        },
+        "description": "Delete feedback form and all associated responses. Only admins can delete feedback forms."
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000/api",
+      "description": "Base URL for the API (update for production)"
+    },
+    {
+      "key": "session_id",
+      "value": "your-session-uuid-here",
+      "description": "Replace with actual session UUID"
+    },
+    {
+      "key": "admin_token",
+      "value": "your-admin-jwt-token-here",
+      "description": "JWT token for admin user"
+    },
+    {
+      "key": "user_token",
+      "value": "your-user-jwt-token-here",
+      "description": "JWT token for regular user"
+    },
+    {
+      "key": "question_1_id",
+      "value": "question-1-uuid-here",
+      "description": "UUID of first question (get from create feedback response)"
+    },
+    {
+      "key": "question_2_id",
+      "value": "question-2-uuid-here",
+      "description": "UUID of second question"
+    },
+    {
+      "key": "question_3_id",
+      "value": "question-3-uuid-here",
+      "description": "UUID of third question"
+    },
+    {
+      "key": "question_4_id",
+      "value": "question-4-uuid-here",
+      "description": "UUID of fourth question"
+    },
+    {
+      "key": "question_5_id",
+      "value": "question-5-uuid-here",
+      "description": "UUID of fifth question"
+    }
+  ]
+} 

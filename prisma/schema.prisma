@@ -1,0 +1,588 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String         @id @default(uuid())
+  name                 String
+  email                String         @unique
+  password             String
+  profilePhoto         String?
+  role                 Role           @default(USER)
+  emailVerified        Boolean        @default(false)
+  phoneNumber          String?        @unique
+  companyPosition      String?
+  department           String?
+  isActive             Boolean        @default(true)
+  belt                 Belt           @default(WHITE)
+  sessionsParticipated Session[]      @relation("SessionParticipants")
+  sessionsInvited      Session[]      @relation("SessionInvited")
+  sessionsCreated      Session[]      @relation("SessionCreatedBy")
+  quizResponses        QuizResponse[] @relation("UserQuizResponses")
+  pollResponses        PollResponse[] @relation("UserPollResponses")
+  participatedPolls    Poll[]         @relation("PollParticipants")
+  contentCanView       Content[]      @relation("ContentCanView")
+  contentCanEdit       Content[]      @relation("ContentCanEdit")
+  activityLogs         ActivityLog[]      @relation("UserActivityLogs")
+  teamMemberships      TeamMember[]       @relation("UserTeamMemberships")
+  pointAwardsGiven     TeamPointAward[]         @relation("PointAwardsGiven") // Points awarded to teams by this admin
+  individualPointsReceived IndividualPointAward[] @relation("IndividualPointsReceived") // Individual points received by this user
+  individualPointAwardsGiven IndividualPointAward[] @relation("IndividualPointAwardsGiven") // Individual points awarded by this admin
+  feedbackResponses    FeedbackResponse[]       @relation("UserFeedbackResponses") // Feedback responses given by this user
+  // Survey module relationships
+  departmentAssignments    UserDepartmentAssignment[] @relation("UserDepartmentAssignments")
+  assignmentsMade          UserDepartmentAssignment[] @relation("AssignmentsMade")
+  departmentHeadOf         Department[]               @relation("DepartmentHead")
+  teamLeadOf               SurveyTeam[]               @relation("TeamLead")
+  surveysCreated           Survey[]                   @relation("SurveysCreated")
+  surveyAssignmentsMade    SurveyAssignment[]         @relation("SurveyAssignmentsMade")
+  surveyResponses          SurveyResponse[]           @relation("UserSurveyResponses")
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  xpPoints             Int                      @default(0) // Experience points
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum Belt {
+  WHITE
+  YELLOW
+  ORANGE
+  GREEN
+  BROWN
+  BLACK
+}
+
+model Session {
+  id              String       @id @default(uuid())
+  title           String
+  description     String?
+  state           SessionState @default(UPCOMING) // Session status
+  participants    User[]       @relation("SessionParticipants") // Named relation for many-to-many
+  invited         User[]       @relation("SessionInvited") // Named relation for invited users
+  invitedEmails   String[] // Store all invited email addresses
+  joiningCode     String?      @unique // Unique code/token for joining
+  qrCode          String? // URL to generated QR code
+  startTime       DateTime?
+  endTime         DateTime? // When the session ends
+  expiryDate      DateTime? // When the joining code expires
+  maxParticipants Int? // Maximum number of participants
+  allowGuests     Boolean      @default(false) // Allow guests or not
+  isActive        Boolean      @default(true) // Tracks if session is active
+  createdBy       User         @relation("SessionCreatedBy", fields: [createdById], references: [id]) // Named relation for one-to-many
+  createdById     String
+  quizzes         Quiz[]       @relation("SessionQuizzes") // Named relation for quizzes
+  polls           Poll[]                   @relation("SessionPolls") // Named relation for polls
+  content         Content[]                @relation("SessionContent") // Named relation for content
+  teams           Team[]                   @relation("SessionTeams") // Named relation for teams
+  individualPointAwards IndividualPointAward[] @relation("SessionIndividualPointAwards") // Individual point awards in this session
+  feedbacks       Feedback[]               @relation("SessionFeedbacks") // Session feedbacks
+  surveys         Survey[]                 @relation("SessionSurveys") // Session surveys
+  organizations   Organization[]           @relation("SessionOrganizations") // Session organizations
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+}
+
+enum SessionState {
+  UPCOMING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Quiz {
+  id                String         @id @default(uuid())
+  title             String
+  session           Session        @relation("SessionQuizzes", fields: [sessionId], references: [id])
+  sessionId         String
+  timeLimitSeconds  Int? // Time limit for quiz in seconds
+  pointsPerQuestion Int            @default(10) // Points per question
+  passingScore      Int? // Minimum score to pass
+  totalMarks        Int? // Total marks for the quiz
+  questions         Question[]     @relation("QuizQuestions") // Named relation
+  responses         QuizResponse[] @relation("QuizResponses") // Named relation
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  retryQuiz         Boolean        @default(false) // Option to retry the quiz
+}
+
+model Question {
+  id            String       @id @default(uuid())
+  quiz          Quiz         @relation("QuizQuestions", fields: [quizId], references: [id])
+  quizId        String
+  text          String // Question text
+  type          QuestionType // e.g., MULTIPLE_CHOICE, TEXT, MULTI_CORRECT
+  imageUrl      String? // Optional URL to an image for the question
+  options       String? // Comma-separated options (e.g., "A,B,C,D")
+  correctAnswer String? // Correct answer 
+  order         Int // Order of question in quiz
+  timeTaken     Int? // Time taken to solve the question in milliseconds
+  marks         Int? // Marks assigned to the question
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  MULTI_CORRECT
+  TEXT
+  MATCHING
+}
+
+model QuizResponse {
+  id          String    @id @default(uuid())
+  quiz        Quiz      @relation("QuizResponses", fields: [quizId], references: [id])
+  quizId      String
+  user        User      @relation("UserQuizResponses", fields: [userId], references: [id])
+  userId      String
+  score       Float?
+  completedAt DateTime?
+  answers     String? // Comma-separated answers (e.g., "A,C" or "User's text")
+  createdAt   DateTime  @default(now())
+  timeTaken   Int? // Time taken for each question in seconds
+  totalScore  Float? // Total score for the quiz
+}
+
+model Poll {
+  id                String         @id @default(uuid())
+  title             String
+  question          String         @default("") // Keeping for backward compatibility
+  session           Session?       @relation("SessionPolls", fields: [sessionId], references: [id])
+  sessionId         String?
+  joiningCode       String         @unique
+  type              PollType // This will be the default poll type, can be overridden per question
+  isLive            Boolean        @default(false)
+  showResults       Boolean        @default(false)
+  isPublic          Boolean        @default(false) // make it true for quick polls
+  maxVotes          Int? // Maximum votes per user
+  timeLimit         Int? // Time limit in seconds
+  responseLimit     Int? // Maximum length for text responses
+  questions         PollQuestion[] @relation("PollQuestions") // New relation to poll questions
+  responses         PollResponse[] @relation("PollResponses")
+  options           PollOption[]   @relation("PollOptions") // Keeping for backward compatibility
+  participants      User[]         @relation("PollParticipants")
+  moderationEnabled Boolean        @default(false) // Enable moderation of responses
+  autoRefresh       Boolean        @default(true) // Auto refresh results in real-time
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+}
+
+// New model for poll questions
+model PollQuestion {
+  id        String               @id @default(uuid())
+  poll      Poll                 @relation("PollQuestions", fields: [pollId], references: [id], onDelete: Cascade)
+  pollId    String
+  question  String // The question text
+  type      PollType // Type can be set per question, overriding poll default
+  order     Int // Order of questions in the poll
+  options   PollQuestionOption[] @relation("QuestionOptions")
+  responses PollResponse[]       @relation("QuestionResponses")
+  isActive  Boolean              @default(false) // Whether this question is currently active
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+}
+
+// New model for options specific to a poll question
+model PollQuestionOption {
+  id         String         @id @default(uuid())
+  question   PollQuestion   @relation("QuestionOptions", fields: [questionId], references: [id], onDelete: Cascade)
+  questionId String
+  text       String // Option text
+  imageUrl   String? // Optional image for the option
+  order      Int // Display order
+  responses  PollResponse[] @relation("QuestionOptionResponses") // Track responses for this option
+}
+
+model PollResponse {
+  id               String              @id @default(uuid())
+  poll             Poll                @relation("PollResponses", fields: [pollId], references: [id], onDelete: Cascade)
+  pollId           String
+  question         PollQuestion?       @relation("QuestionResponses", fields: [questionId], references: [id])
+  questionId       String? // New field to link response to a specific question
+  user             User                @relation("UserPollResponses", fields: [userId], references: [id])
+  userId           String
+  option           PollOption?         @relation(fields: [optionId], references: [id]) // Keep for backward compatibility
+  optionId         String? // For choice-based polls (backward compatibility)
+  questionOption   PollQuestionOption? @relation("QuestionOptionResponses", fields: [questionOptionId], references: [id])
+  questionOptionId String? // New field for linking to question-specific options
+  textResponse     String? // For text-based polls and word clouds
+  ranking          Int? // For ranking-type polls
+  scale            Int? // For scale-type polls
+  anonymous        Boolean             @default(false) // Allow anonymous responses
+  moderated        Boolean             @default(false) // Whether this response was moderated
+  weight           Int                 @default(1) // Weight of the response (for word cloud)
+  createdAt        DateTime            @default(now())
+}
+
+enum PollType {
+  SINGLE_CHOICE // Single selection
+  MULTIPLE_CHOICE // Multiple selections
+  WORD_CLOUD // Word cloud responses
+  RANKING // Rank options
+  SCALE // 1-5 or 1-10 scale
+  OPEN_TEXT // Free-form text responses
+  Q_AND_A // Question and answer format
+}
+
+model PollOption {
+  id        String         @id @default(uuid())
+  poll      Poll           @relation("PollOptions", fields: [pollId], references: [id], onDelete: Cascade)
+  pollId    String
+  text      String // Option text
+  imageUrl  String? // Optional image for the option
+  order     Int // Display order
+  responses PollResponse[] // Track responses for this option
+}
+
+model Content {
+  id        String      @id @default(uuid())
+  title     String
+  url       String // URL to GCP Storage
+  type      ContentType
+  session   Session?    @relation("SessionContent", fields: [sessionId], references: [id])
+  sessionId String?
+  canView   User[]      @relation("ContentCanView") // Named relation
+  canEdit   User[]      @relation("ContentCanEdit") // Named relation
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+enum ContentType {
+  IMAGE
+  PDF
+  TEXT
+  VIDEO
+  DOCUMENT
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  user      User     @relation("UserActivityLogs", fields: [userId], references: [id])
+  userId    String
+  action    String // e.g., "quiz_completed", "session_joined"
+  details   String? // Additional details as plain text
+  createdAt DateTime @default(now())
+}
+
+model Team {
+  id          String            @id @default(uuid())
+  name        String // Team name
+  description String? // Optional team description
+  color       String? // Optional color for UI representation
+  session     Session           @relation("SessionTeams", fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId   String
+  members     TeamMember[]            @relation("TeamMembers")
+  pointAwards TeamPointAward[]        @relation("TeamPointAwards") // Manual team point awards
+  individualPointAwards IndividualPointAward[] @relation("TeamIndividualPointAwards") // Individual point awards for team members
+  maxMembers  Int?                    // Maximum number of members allowed
+  isActive    Boolean                 @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([sessionId, name]) // Ensure unique team names within a session
+}
+
+model TeamMember {
+  id       String   @id @default(uuid())
+  team     Team     @relation("TeamMembers", fields: [teamId], references: [id], onDelete: Cascade)
+  teamId   String
+  user     User     @relation("UserTeamMemberships", fields: [userId], references: [id])
+  userId   String
+  role     TeamRole @default(MEMBER) // Role within the team
+  joinedAt DateTime @default(now())
+
+  @@unique([teamId, userId]) // Ensure a user can only be in a team once
+}
+
+enum TeamRole {
+  LEADER
+  MEMBER
+}
+
+// New model for tracking manual point awards given by admins
+model TeamPointAward {
+  id          String   @id @default(uuid())
+  team        Team     @relation("TeamPointAwards", fields: [teamId], references: [id], onDelete: Cascade)
+  teamId      String
+  awardedBy   User     @relation("PointAwardsGiven", fields: [awardedById], references: [id])
+  awardedById String
+  points      Int // Points awarded (can be positive or negative)
+  reason      String   @default("Manual point award") // Reason for awarding points
+  category    String?  // Optional category (e.g., "Participation", "Innovation", "Leadership")
+  createdAt   DateTime @default(now())
+}
+
+// New model for tracking individual point awards given by admins to specific users/candidates
+model IndividualPointAward {
+  id          String   @id @default(uuid())
+  user        User     @relation("IndividualPointsReceived", fields: [userId], references: [id])
+  userId      String   // The candidate receiving the points
+  session     Session  @relation("SessionIndividualPointAwards", fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId   String   // Session context for the points
+  team        Team?    @relation("TeamIndividualPointAwards", fields: [teamId], references: [id], onDelete: Cascade)
+  teamId      String?  // Optional: if the user is in a team, this helps with leaderboard calculations
+  awardedBy   User     @relation("IndividualPointAwardsGiven", fields: [awardedById], references: [id])
+  awardedById String   // Admin who awarded the points
+  points      Int      // Points awarded (can be positive or negative)
+  reason      String   @default("Individual achievement") // Reason for awarding points
+  category    String?  // Optional category (e.g., "Quiz Performance", "Participation", "Leadership")
+  createdAt   DateTime @default(now())
+}
+
+// Feedback models for session feedback collection
+model Feedback {
+  id           String             @id @default(uuid())
+  title        String // Title of the feedback form
+  description  String? // Optional description
+  session      Session            @relation("SessionFeedbacks", fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId    String
+  isActive     Boolean            @default(true) // Whether feedback is currently active
+  isAnonymous  Boolean            @default(false) // Allow anonymous feedback
+  questions    FeedbackQuestion[] @relation("FeedbackQuestions")
+  responses    FeedbackResponse[] @relation("FeedbackResponses")
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  // Removed unique constraint to allow multiple feedback forms per session
+}
+
+model FeedbackQuestion {
+  id         String             @id @default(uuid())
+  feedback   Feedback           @relation("FeedbackQuestions", fields: [feedbackId], references: [id], onDelete: Cascade)
+  feedbackId String
+  question   String // The question text
+  type       FeedbackType       @default(SMILEY_SCALE) // Type of feedback question
+  isRequired Boolean            @default(true) // Whether this question is required
+  order      Int // Display order of questions
+  responses  FeedbackResponse[] @relation("FeedbackQuestionResponses")
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+}
+
+model FeedbackResponse {
+  id         String           @id @default(uuid())
+  feedback   Feedback         @relation("FeedbackResponses", fields: [feedbackId], references: [id], onDelete: Cascade)
+  feedbackId String
+  question   FeedbackQuestion @relation("FeedbackQuestionResponses", fields: [questionId], references: [id], onDelete: Cascade)
+  questionId String
+  user       User             @relation("UserFeedbackResponses", fields: [userId], references: [id])
+  userId     String
+  rating     SmileyRating? // For smiley scale responses
+  textAnswer String? // For text responses
+  isAnonymous Boolean         @default(false) // Whether this response is anonymous
+  createdAt  DateTime         @default(now())
+
+  @@unique([feedbackId, questionId, userId]) // One response per user per question
+}
+
+enum FeedbackType {
+  SMILEY_SCALE // 5-point smiley scale (default)
+  TEXT // Open text response
+}
+
+enum SmileyRating {
+  VERY_POOR // 1 - 😞
+  POOR // 2 - 😟
+  AVERAGE // 3 - 😐
+  GOOD // 4 - 😊
+  EXCELLENT // 5 - 😁
+}
+
+// ==========================================
+// SURVEY MODULE - Session-Based with Department Hierarchy
+// ==========================================
+
+// Organization model for session-based user management
+model Organization {
+  id          String       @id @default(uuid())
+  session     Session?     @relation("SessionOrganizations", fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId   String?      // Temporarily nullable for safe migration
+  name        String
+  description String?
+  settings    Json?        // Organization-wide settings
+  departments Department[] @relation("OrganizationDepartments")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([sessionId, name]) // Unique organization names within session
+}
+
+// Department model for organizational hierarchy
+model Department {
+  id                     String                      @id @default(uuid())
+  organization           Organization                @relation("OrganizationDepartments", fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId         String
+  name                   String
+  description            String?
+  parentDepartment       Department?                 @relation("DepartmentHierarchy", fields: [parentDepartmentId], references: [id])
+  parentDepartmentId     String?
+  subDepartments         Department[]                @relation("DepartmentHierarchy")
+  departmentHead         User?                       @relation("DepartmentHead", fields: [departmentHeadId], references: [id])
+  departmentHeadId       String?
+  teams                  SurveyTeam[]                @relation("DepartmentTeams")
+  userAssignments        UserDepartmentAssignment[]  @relation("DepartmentUsers")
+  createdAt              DateTime                    @default(now())
+  updatedAt              DateTime                    @updatedAt
+
+  @@unique([organizationId, name]) // Unique department names within organization
+}
+
+// Team model for sub-department structure
+model SurveyTeam {
+  id                String                      @id @default(uuid())
+  department        Department                  @relation("DepartmentTeams", fields: [departmentId], references: [id], onDelete: Cascade)
+  departmentId      String
+  name              String
+  description       String?
+  teamLead          User?                       @relation("TeamLead", fields: [teamLeadId], references: [id])
+  teamLeadId        String?
+  userAssignments   UserDepartmentAssignment[]  @relation("TeamUsers")
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+
+  @@unique([departmentId, name]) // Unique team names within department
+}
+
+// User department and team assignments
+model UserDepartmentAssignment {
+  id           String      @id @default(uuid())
+  user         User        @relation("UserDepartmentAssignments", fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  department   Department  @relation("DepartmentUsers", fields: [departmentId], references: [id], onDelete: Cascade)
+  departmentId String
+  team         SurveyTeam? @relation("TeamUsers", fields: [teamId], references: [id], onDelete: SetNull)
+  teamId       String?
+  role         Role        @default(USER) // Using existing Role enum: ADMIN/USER
+  assignedBy   User        @relation("AssignmentsMade", fields: [assignedById], references: [id])
+  assignedById String
+  assignedAt   DateTime    @default(now())
+
+  @@unique([userId, departmentId]) // User can only be assigned to one department
+}
+
+// Survey model - belongs to Session like Quiz and Poll
+model Survey {
+  id                     String             @id @default(uuid())
+  title                  String
+  description            String?
+  session                Session            @relation("SessionSurveys", fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId              String
+  createdBy              User               @relation("SurveysCreated", fields: [createdById], references: [id])
+  createdById            String
+  status                 SurveyStatus       @default(DRAFT)
+  startDate              DateTime?
+  endDate                DateTime?
+  isAnonymous            Boolean            @default(false)
+  allowMultipleResponses Boolean            @default(false)
+  isOptional             Boolean            @default(true)  // Surveys are optional by default
+  settings               Json?              // Survey-specific settings
+  questions              SurveyQuestion[]   @relation("SurveyQuestions")
+  assignments            SurveyAssignment[] @relation("SurveyAssignments")
+  responses              SurveyResponse[]   @relation("SurveyResponses")
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+}
+
+// Survey assignments to departments, teams, or individuals within a session
+model SurveyAssignment {
+  id             String              @id @default(uuid())
+  survey         Survey              @relation("SurveyAssignments", fields: [surveyId], references: [id], onDelete: Cascade)
+  surveyId       String
+  assignedToType AssignmentTargetType
+  assignedToId   String              // ID of department/team/user
+  assignedBy     User                @relation("SurveyAssignmentsMade", fields: [assignedById], references: [id])
+  assignedById   String
+  deadline       DateTime?
+  reminderSchedule Json?             // JSON for reminder configuration
+  assignedAt     DateTime            @default(now())
+}
+
+// Survey questions - flexible question types for any survey
+model SurveyQuestion {
+  id              String                   @id @default(uuid())
+  survey          Survey                   @relation("SurveyQuestions", fields: [surveyId], references: [id], onDelete: Cascade)
+  surveyId        String
+  questionText    String
+  questionType    SurveyQuestionType
+  surveyType      SurveyType               @default(CUSTOM) // Category of the question
+  options         Json?                    // JSON for multiple choice, rating scales, matrix options
+  validationRules Json?                    // JSON for validation rules
+  isRequired      Boolean                  @default(true)
+  orderIndex      Int
+  responses       SurveyQuestionResponse[] @relation("QuestionResponses")
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+}
+
+// Survey responses (session participants responding to surveys)
+model SurveyResponse {
+  id                  String                   @id @default(uuid())
+  survey              Survey                   @relation("SurveyResponses", fields: [surveyId], references: [id], onDelete: Cascade)
+  surveyId            String
+  user                User                     @relation("UserSurveyResponses", fields: [userId], references: [id])
+  userId              String
+  submittedAt         DateTime?
+  completionStatus    CompletionStatus         @default(INCOMPLETE)
+  responseTimeSeconds Int?
+  ipAddress           String?                  // For audit
+  userAgent           String?                  // For audit
+  questionResponses   SurveyQuestionResponse[] @relation("SurveyQuestionResponses")
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+
+  @@unique([surveyId, userId]) // One response per user per survey (unless multiple responses allowed)
+}
+
+// Individual question responses
+model SurveyQuestionResponse {
+  id               String         @id @default(uuid())
+  surveyResponse   SurveyResponse @relation("SurveyQuestionResponses", fields: [surveyResponseId], references: [id], onDelete: Cascade)
+  surveyResponseId String
+  question         SurveyQuestion @relation("QuestionResponses", fields: [questionId], references: [id], onDelete: Cascade)
+  questionId       String
+  responseValue    Json           // Flexible storage for any response type
+  respondedAt      DateTime       @default(now())
+
+  @@unique([surveyResponseId, questionId]) // One response per question per survey response
+}
+
+// Enums for survey module
+enum SurveyType {
+  BEHAVIORAL      // For behavioral assessments
+  SATISFACTION    // For employee satisfaction
+  ORGANIZATIONAL  // For organizational assessment
+  CUSTOM          // For custom surveys
+}
+
+enum SurveyStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+  ARCHIVED
+}
+
+enum AssignmentTargetType {
+  DEPARTMENT
+  TEAM
+  INDIVIDUAL
+}
+
+enum SurveyQuestionType {
+  MULTIPLE_CHOICE    // Single/multiple selection
+  RATING_SCALE       // Likert scales, star ratings
+  TEXT               // Short/long text responses
+  BEHAVIORAL         // Scenario-based questions
+  MATRIX             // Multiple items on same scale
+}
+
+enum CompletionStatus {
+  INCOMPLETE
+  COMPLETE
+  PARTIAL
+}

@@ -11,6 +11,7 @@ import teamRoutes from './team.routes';
 import feedbackRoutes from './feedback.routes';
 import organizationRoutes from './organization.routes';
 import surveyRoutes from './survey.routes';
+import lmsRoutes from './lms.routes';
 
 const router = Router();
 
@@ -66,5 +67,6 @@ router.use('/teams', teamRoutes);
 router.use('/feedback', feedbackRoutes);
 router.use('/organization', organizationRoutes);
 router.use('/survey', surveyRoutes);
+router.use('/lms', lmsRoutes);
 
 export default router;

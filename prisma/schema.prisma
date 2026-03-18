@@ -42,6 +42,14 @@ model User {
   surveysCreated           Survey[]                   @relation("SurveysCreated")
   surveyAssignmentsMade    SurveyAssignment[]         @relation("SurveyAssignmentsMade")
   surveyResponses          SurveyResponse[]           @relation("UserSurveyResponses")
+  // LMS module relationships
+  lmsTopicsCreated         LmsTopic[]                 @relation("LmsTopicCreatedBy")
+  lmsLevelAttempts         LmsLevelAttempt[]          @relation("LmsUserLevelAttempts")
+  lmsLevelProgress         LmsUserLevelProgress[]     @relation("LmsUserLevelProgress")
+  lmsTopicProgress         LmsUserTopicProgress[]     @relation("LmsUserTopicProgress")
+  lmsVideoWatchEvents      LmsVideoWatchEvent[]       @relation("LmsUserVideoWatchEvents")
+  lmsXpLedgerEntries       LmsXpLedger[]              @relation("LmsUserXpLedger")
+  lmsBadges                LmsUserBadge[]             @relation("LmsUserBadges")
   createdAt            DateTime                 @default(now())
   updatedAt            DateTime                 @updatedAt
   xpPoints             Int                      @default(0) // Experience points
@@ -585,4 +593,329 @@ enum CompletionStatus {
   INCOMPLETE
   COMPLETE
   PARTIAL
+}
+
+// ==========================================
+// LMS MODULE - Topic -> Level Structured Learning
+// ==========================================
+
+enum LmsContentType {
+  VIDEO
+  READING
+  ATTACHMENT
+  LINK
+}
+
+enum LmsVideoSourceType {
+  UPLOAD
+  EXTERNAL_LINK
+}
+
+enum LmsQuestionType {
+  SINGLE_CHOICE
+  MULTIPLE_CORRECT
+  TEXT
+}
+
+enum LmsAttemptStatus {
+  IN_PROGRESS
+  PASSED
+  FAILED
+  ABANDONED
+}
+
+enum LmsProgressStatus {
+  LOCKED
+  UNLOCKED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum LmsWatchEventType {
+  START
+  PROGRESS
+  PAUSE
+  SEEK
+  COMPLETE
+}
+
+enum LmsXpEventType {
+  VIDEO_COMPLETED
+  QUIZ_PASSED
+  LEVEL_COMPLETED
+  TOPIC_COMPLETED
+  ADMIN_ADJUSTMENT
+}
+
+enum LmsBadgeMilestoneType {
+  LEVELS_COMPLETED
+  TOPICS_COMPLETED
+  XP_THRESHOLD
+  STREAK
+  CUSTOM
+}
+
+enum LmsLeaderboardScope {
+  GLOBAL
+  TOPIC
+}
+
+model LmsTopic {
+  id                       String                   @id @default(uuid())
+  title                    String
+  description              String?
+  slug                     String?                  @unique
+  isPublished              Boolean                  @default(false)
+  isActive                 Boolean                  @default(true)
+  position                 Int?
+  estimatedDurationMinutes Int?
+  createdBy                User                     @relation("LmsTopicCreatedBy", fields: [createdById], references: [id])
+  createdById              String
+  levels                   LmsLevel[]               @relation("LmsTopicLevels")
+  userProgresses           LmsUserTopicProgress[]   @relation("LmsTopicUserProgress")
+  xpEntries                LmsXpLedger[]            @relation("LmsTopicXpEntries")
+  videoEvents              LmsVideoWatchEvent[]     @relation("LmsTopicVideoWatchEvents")
+  userBadges               LmsUserBadge[]
+  leaderboardSnapshots     LmsLeaderboardSnapshot[] @relation("LmsTopicLeaderboardSnapshots")
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
+
+  @@index([createdById, createdAt])
+}
+
+model LmsLevel {
+  id                           String                 @id @default(uuid())
+  topic                        LmsTopic               @relation("LmsTopicLevels", fields: [topicId], references: [id], onDelete: Cascade)
+  topicId                      String
+  title                        String
+  description                  String?
+  position                     Int
+  isPublished                  Boolean                @default(false)
+  requireVideoCompletion       Boolean                @default(false)
+  minVideoWatchPercent         Float                  @default(0)
+  requireQuizPass              Boolean                @default(false)
+  quizPassingPercent           Float                  @default(0)
+  requireReadingAcknowledgement Boolean               @default(false)
+  xpOnCompletion               Int                    @default(0)
+  contents                     LmsLevelContent[]      @relation("LmsLevelContents")
+  questions                    LmsQuestion[]          @relation("LmsLevelQuestions")
+  attempts                     LmsLevelAttempt[]      @relation("LmsLevelAttempts")
+  userProgresses               LmsUserLevelProgress[] @relation("LmsLevelUserProgress")
+  xpEntries                    LmsXpLedger[]          @relation("LmsLevelXpEntries")
+  videoEvents                  LmsVideoWatchEvent[]   @relation("LmsLevelVideoWatchEvents")
+  createdAt                    DateTime               @default(now())
+  updatedAt                    DateTime               @updatedAt
+
+  @@unique([topicId, position])
+  @@index([topicId, isPublished])
+}
+
+model LmsLevelContent {
+  id                   String               @id @default(uuid())
+  level                LmsLevel             @relation("LmsLevelContents", fields: [levelId], references: [id], onDelete: Cascade)
+  levelId              String
+  type                 LmsContentType
+  title                String
+  description          String?
+  position             Int
+  isRequired           Boolean              @default(true)
+  videoSourceType      LmsVideoSourceType?
+  videoUrl             String?
+  videoDurationSeconds Int?
+  externalUrl          String?
+  attachmentUrl        String?
+  metadata             Json?
+  videoEvents          LmsVideoWatchEvent[] @relation("LmsContentVideoWatchEvents")
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  @@unique([levelId, position])
+  @@index([levelId, type])
+}
+
+model LmsQuestion {
+  id             String                  @id @default(uuid())
+  level          LmsLevel                @relation("LmsLevelQuestions", fields: [levelId], references: [id], onDelete: Cascade)
+  levelId        String
+  questionText   String
+  type           LmsQuestionType
+  position       Int
+  isRequired     Boolean                 @default(true)
+  points         Int                     @default(1)
+  explanation    String?
+  options        LmsQuestionOption[]     @relation("LmsQuestionOptions")
+  attemptAnswers LmsLevelAttemptAnswer[] @relation("LmsAttemptAnswerQuestion")
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  @@unique([levelId, position])
+}
+
+model LmsQuestionOption {
+  id         String      @id @default(uuid())
+  question   LmsQuestion @relation("LmsQuestionOptions", fields: [questionId], references: [id], onDelete: Cascade)
+  questionId String
+  optionText String
+  position   Int
+  isCorrect  Boolean     @default(false)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@unique([questionId, position])
+}
+
+model LmsLevelAttempt {
+  id              String                  @id @default(uuid())
+  level           LmsLevel                @relation("LmsLevelAttempts", fields: [levelId], references: [id], onDelete: Cascade)
+  levelId         String
+  user            User                    @relation("LmsUserLevelAttempts", fields: [userId], references: [id], onDelete: Cascade)
+  userId          String
+  attemptNumber   Int                     @default(1)
+  status          LmsAttemptStatus        @default(IN_PROGRESS)
+  scorePercent    Float?
+  startedAt       DateTime                @default(now())
+  submittedAt     DateTime?
+  timeSpentSeconds Int                    @default(0)
+  earnedXp        Int                     @default(0)
+  answers         LmsLevelAttemptAnswer[] @relation("LmsAttemptAnswers")
+
+  @@unique([userId, levelId, attemptNumber])
+  @@index([userId, levelId, startedAt])
+}
+
+model LmsLevelAttemptAnswer {
+  id                String          @id @default(uuid())
+  attempt           LmsLevelAttempt @relation("LmsAttemptAnswers", fields: [attemptId], references: [id], onDelete: Cascade)
+  attemptId         String
+  question          LmsQuestion     @relation("LmsAttemptAnswerQuestion", fields: [questionId], references: [id], onDelete: Cascade)
+  questionId        String
+  selectedOptionIds String[]
+  textAnswer        String?
+  isCorrect         Boolean?
+  pointsAwarded     Int             @default(0)
+  createdAt         DateTime        @default(now())
+
+  @@unique([attemptId, questionId])
+}
+
+model LmsUserLevelProgress {
+  id                       String            @id @default(uuid())
+  user                     User              @relation("LmsUserLevelProgress", fields: [userId], references: [id], onDelete: Cascade)
+  userId                   String
+  level                    LmsLevel          @relation("LmsLevelUserProgress", fields: [levelId], references: [id], onDelete: Cascade)
+  levelId                  String
+  status                   LmsProgressStatus @default(LOCKED)
+  unlockedAt               DateTime?
+  startedAt                DateTime?
+  completedAt              DateTime?
+  watchPercent             Float             @default(0)
+  lastVideoPositionSeconds Int               @default(0)
+  timeSpentSeconds         Int               @default(0)
+  totalAttempts            Int               @default(0)
+  successfulAttempts       Int               @default(0)
+  latestScorePercent       Float?
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+
+  @@unique([userId, levelId])
+  @@index([levelId, status])
+}
+
+model LmsUserTopicProgress {
+  id                String            @id @default(uuid())
+  user              User              @relation("LmsUserTopicProgress", fields: [userId], references: [id], onDelete: Cascade)
+  userId            String
+  topic             LmsTopic          @relation("LmsTopicUserProgress", fields: [topicId], references: [id], onDelete: Cascade)
+  topicId           String
+  status            LmsProgressStatus @default(LOCKED)
+  completionPercent Float             @default(0)
+  completedLevels   Int               @default(0)
+  totalLevels       Int               @default(0)
+  timeSpentSeconds  Int               @default(0)
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@unique([userId, topicId])
+  @@index([topicId, completionPercent])
+}
+
+model LmsVideoWatchEvent {
+  id                   String            @id @default(uuid())
+  user                 User              @relation("LmsUserVideoWatchEvents", fields: [userId], references: [id], onDelete: Cascade)
+  userId               String
+  topic                LmsTopic?         @relation("LmsTopicVideoWatchEvents", fields: [topicId], references: [id], onDelete: SetNull)
+  topicId              String?
+  level                LmsLevel          @relation("LmsLevelVideoWatchEvents", fields: [levelId], references: [id], onDelete: Cascade)
+  levelId              String
+  content              LmsLevelContent?  @relation("LmsContentVideoWatchEvents", fields: [contentId], references: [id], onDelete: SetNull)
+  contentId            String?
+  eventType            LmsWatchEventType
+  watchSeconds         Int               @default(0)
+  videoPositionSeconds Int               @default(0)
+  watchPercent         Float             @default(0)
+  createdAt            DateTime          @default(now())
+
+  @@index([userId, levelId, createdAt])
+  @@index([contentId, createdAt])
+}
+
+model LmsXpLedger {
+  id          String         @id @default(uuid())
+  user        User           @relation("LmsUserXpLedger", fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  topic       LmsTopic?      @relation("LmsTopicXpEntries", fields: [topicId], references: [id], onDelete: SetNull)
+  topicId     String?
+  level       LmsLevel?      @relation("LmsLevelXpEntries", fields: [levelId], references: [id], onDelete: SetNull)
+  levelId     String?
+  eventType   LmsXpEventType
+  pointsDelta Int
+  reason      String?
+  metadata    Json?
+  createdAt   DateTime       @default(now())
+
+  @@index([userId, createdAt])
+  @@index([topicId, createdAt])
+}
+
+model LmsBadge {
+  id            String                @id @default(uuid())
+  code          String                @unique
+  name          String
+  description   String?
+  iconUrl       String?
+  milestoneType LmsBadgeMilestoneType
+  threshold     Int?
+  isActive      Boolean               @default(true)
+  userBadges    LmsUserBadge[]        @relation("LmsBadgeAssignments")
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+}
+
+model LmsUserBadge {
+  id        String    @id @default(uuid())
+  user      User      @relation("LmsUserBadges", fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  badge     LmsBadge  @relation("LmsBadgeAssignments", fields: [badgeId], references: [id], onDelete: Cascade)
+  badgeId   String
+  topic     LmsTopic? @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  topicId   String?
+  metadata  Json?
+  awardedAt DateTime  @default(now())
+
+  @@unique([userId, badgeId])
+  @@index([topicId, awardedAt])
+}
+
+model LmsLeaderboardSnapshot {
+  id         String             @id @default(uuid())
+  scope      LmsLeaderboardScope
+  topic      LmsTopic?          @relation("LmsTopicLeaderboardSnapshots", fields: [topicId], references: [id], onDelete: SetNull)
+  topicId    String?
+  rankings   Json
+  generatedAt DateTime          @default(now())
+
+  @@index([scope, generatedAt])
+  @@index([topicId, generatedAt])
 }

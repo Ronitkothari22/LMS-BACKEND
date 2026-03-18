@@ -4,7 +4,7 @@ import logger from '../config/logger.config';
 
  
 export function errorMiddleware(
-  error: HttpException,
+  error: HttpException & { code?: string; context?: Record<string, unknown> },
   req: Request,
   res: Response,
   _next: NextFunction,
@@ -14,10 +14,14 @@ export function errorMiddleware(
 
   logger.error(`${status} - ${message} - ${req.path} - ${req.method} - ${req.ip}`, {
     error: error.toString(),
+    code: error.code,
+    context: error.context,
   });
 
   res.status(status).json({
     success: false,
     message,
+    ...(error.code ? { code: error.code } : {}),
+    ...(error.context ? { context: error.context } : {}),
   });
 }

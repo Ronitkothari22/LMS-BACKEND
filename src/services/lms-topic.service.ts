@@ -186,6 +186,23 @@ class LmsTopicService {
             position: 'asc',
           },
           include: {
+            contents: {
+              orderBy: {
+                position: 'asc',
+              },
+            },
+            questions: {
+              orderBy: {
+                position: 'asc',
+              },
+              include: {
+                options: {
+                  orderBy: {
+                    position: 'asc',
+                  },
+                },
+              },
+            },
             _count: {
               select: {
                 contents: true,

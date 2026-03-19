@@ -175,6 +175,38 @@ export const addLevelReadingContent: RequestHandler = async (_req, _res, next) =
   }
 };
 
+export const updateLevelContent: RequestHandler = async (req, res, next) => {
+  try {
+    const contentId = getParamString(req.params.contentId);
+    const content = await lmsContentService.updateContent(contentId, req.body);
+
+    logger.info(`LMS content updated: ${contentId}`);
+    res.json({
+      success: true,
+      message: 'LMS content updated successfully',
+      data: { content },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteLevelContent: RequestHandler = async (req, res, next) => {
+  try {
+    const contentId = getParamString(req.params.contentId);
+    const result = await lmsContentService.deleteContent(contentId);
+
+    logger.info(`LMS content deleted: ${contentId}`);
+    res.json({
+      success: true,
+      message: 'LMS content deleted successfully',
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const addLevelQuestions: RequestHandler = async (_req, _res, next) => {
   try {
     const levelId = getParamString(_req.params.levelId);

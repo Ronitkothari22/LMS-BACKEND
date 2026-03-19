@@ -15,6 +15,8 @@ import {
   updateLevelSchema,
   addLevelVideoContentSchema,
   addLevelReadingContentSchema,
+  contentIdParamSchema,
+  updateLevelContentSchema,
   addLevelQuestionsSchema,
   questionIdParamSchema,
   updateQuestionSchema,
@@ -125,6 +127,22 @@ router.post(
   isAdmin as RequestHandler,
   validateRequest(addLevelReadingContentSchema),
   lmsAdminController.addLevelReadingContent,
+);
+
+router.put(
+  '/content/:contentId',
+  authenticateToken as RequestHandler,
+  isAdmin as RequestHandler,
+  validateRequest(updateLevelContentSchema),
+  lmsAdminController.updateLevelContent,
+);
+
+router.delete(
+  '/content/:contentId',
+  authenticateToken as RequestHandler,
+  isAdmin as RequestHandler,
+  validateRequest(contentIdParamSchema),
+  lmsAdminController.deleteLevelContent,
 );
 
 router.post(

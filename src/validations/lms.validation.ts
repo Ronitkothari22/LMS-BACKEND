@@ -113,6 +113,29 @@ export const addLevelReadingContentSchema = z.object({
   }),
 });
 
+export const contentIdParamSchema = z.object({
+  params: z.object({
+    contentId: uuidParam,
+  }),
+});
+
+export const updateLevelContentSchema = z.object({
+  params: z.object({
+    contentId: uuidParam,
+  }),
+  body: z.object({
+    title: z.string().min(2).optional(),
+    description: z.string().optional(),
+    position: z.number().int().nonnegative().optional(),
+    isRequired: z.boolean().optional(),
+    videoSourceType: z.enum(['UPLOAD', 'EXTERNAL_LINK']).optional(),
+    videoUrl: z.string().url().optional(),
+    externalUrl: z.string().url().optional(),
+    attachmentUrl: z.string().url().optional(),
+    videoDurationSeconds: z.number().int().nonnegative().optional(),
+  }),
+});
+
 export const addLevelQuestionsSchema = z.object({
   params: z.object({
     levelId: uuidParam,

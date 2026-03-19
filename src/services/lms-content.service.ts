@@ -5,6 +5,7 @@ import type {
   CreateLmsVideoContentInput,
   CreateLmsReadingContentInput,
   CreateLmsQuestionInput,
+  UpdateLmsContentInput,
   UpdateLmsQuestionInput,
 } from '../types/lms.types';
 
@@ -37,6 +38,27 @@ class LmsContentService {
     }
 
     return question;
+  }
+
+  private async ensureContentExists(contentId: string) {
+    const content = await prisma.lmsLevelContent.findUnique({
+      where: { id: contentId },
+      select: {
+        id: true,
+        levelId: true,
+        position: true,
+        type: true,
+        videoSourceType: true,
+        videoUrl: true,
+        externalUrl: true,
+      },
+    });
+
+    if (!content) {
+      throw new HttpException(404, 'LMS content not found');
+    }
+
+    return content;
   }
 
   private async shiftContentPositionsForCreate(
@@ -73,6 +95,63 @@ class LmsContentService {
       await tx.lmsQuestion.update({
         where: { id: row.id },
         data: { position: row.position + 1 },
+      });
+    }
+  }
+
+  private async shiftContentPositionsForMove(
+    tx: Prisma.TransactionClient,
+    levelId: string,
+    oldPosition: number,
+    newPosition: number,
+  ) {
+    if (newPosition === oldPosition) return;
+
+    if (newPosition < oldPosition) {
+      const rows = await tx.lmsLevelContent.findMany({
+        where: { levelId, position: { gte: newPosition, lt: oldPosition } },
+        orderBy: { position: 'desc' },
+        select: { id: true, position: true },
+      });
+
+      for (const row of rows) {
+        await tx.lmsLevelContent.update({
+          where: { id: row.id },
+          data: { position: row.position + 1 },
+        });
+      }
+      return;
+    }
+
+    const rows = await tx.lmsLevelContent.findMany({
+      where: { levelId, position: { gt: oldPosition, lte: newPosition } },
+      orderBy: { position: 'asc' },
+      select: { id: true, position: true },
+    });
+
+    for (const row of rows) {
+      await tx.lmsLevelContent.update({
+        where: { id: row.id },
+        data: { position: row.position - 1 },
+      });
+    }
+  }
+
+  private async shiftContentPositionsForDelete(
+    tx: Prisma.TransactionClient,
+    levelId: string,
+    deletedPosition: number,
+  ) {
+    const rows = await tx.lmsLevelContent.findMany({
+      where: { levelId, position: { gt: deletedPosition } },
+      orderBy: { position: 'asc' },
+      select: { id: true, position: true },
+    });
+
+    for (const row of rows) {
+      await tx.lmsLevelContent.update({
+        where: { id: row.id },
+        data: { position: row.position - 1 },
       });
     }
   }
@@ -226,6 +305,65 @@ class LmsContentService {
 
       return created;
     });
+  }
+
+  async updateContent(contentId: string, input: UpdateLmsContentInput) {
+    const existing = await this.ensureContentExists(contentId);
+
+    return prisma.$transaction(async tx => {
+      if (typeof input.position === 'number' && input.position !== existing.position) {
+        await this.shiftContentPositionsForMove(tx, existing.levelId, existing.position, input.position);
+      }
+
+      const isVideo = existing.type === 'VIDEO';
+      const finalVideoSourceType = input.videoSourceType ?? existing.videoSourceType;
+      const finalVideoUrl = input.videoUrl ?? existing.videoUrl;
+      const finalExternalUrl = input.externalUrl ?? existing.externalUrl;
+
+      if (isVideo && finalVideoSourceType === 'UPLOAD' && !finalVideoUrl) {
+        throw new HttpException(400, 'videoUrl is required when videoSourceType is UPLOAD');
+      }
+      if (isVideo && finalVideoSourceType === 'EXTERNAL_LINK' && !finalExternalUrl) {
+        throw new HttpException(400, 'externalUrl is required when videoSourceType is EXTERNAL_LINK');
+      }
+
+      return tx.lmsLevelContent.update({
+        where: { id: contentId },
+        data: {
+          title: input.title,
+          description: input.description,
+          position: input.position,
+          isRequired: input.isRequired,
+          videoSourceType: isVideo ? finalVideoSourceType : undefined,
+          videoUrl: isVideo
+            ? finalVideoSourceType === 'UPLOAD'
+              ? finalVideoUrl
+              : null
+            : undefined,
+          externalUrl: isVideo
+            ? finalVideoSourceType === 'EXTERNAL_LINK'
+              ? finalExternalUrl
+              : null
+            : input.externalUrl,
+          attachmentUrl: existing.type === 'READING' ? input.attachmentUrl : undefined,
+          videoDurationSeconds: isVideo ? input.videoDurationSeconds : undefined,
+        },
+      });
+    });
+  }
+
+  async deleteContent(contentId: string) {
+    const existing = await this.ensureContentExists(contentId);
+
+    await prisma.$transaction(async tx => {
+      await tx.lmsLevelContent.delete({
+        where: { id: contentId },
+      });
+
+      await this.shiftContentPositionsForDelete(tx, existing.levelId, existing.position);
+    });
+
+    return { id: contentId };
   }
 
   async updateQuestion(questionId: string, input: UpdateLmsQuestionInput) {

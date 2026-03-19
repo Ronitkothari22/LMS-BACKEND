@@ -82,6 +82,18 @@ export interface CreateLmsReadingContentInput {
   position: number;
 }
 
+export interface UpdateLmsContentInput {
+  title?: string;
+  description?: string;
+  position?: number;
+  isRequired?: boolean;
+  videoSourceType?: 'UPLOAD' | 'EXTERNAL_LINK';
+  videoUrl?: string;
+  externalUrl?: string;
+  attachmentUrl?: string;
+  videoDurationSeconds?: number;
+}
+
 export interface CreateLmsQuestionInput {
   questionText: string;
   type: 'SINGLE_CHOICE' | 'MULTIPLE_CORRECT' | 'TEXT';

@@ -16,6 +16,7 @@ const team_routes_1 = __importDefault(require("./team.routes"));
 const feedback_routes_1 = __importDefault(require("./feedback.routes"));
 const organization_routes_1 = __importDefault(require("./organization.routes"));
 const survey_routes_1 = __importDefault(require("./survey.routes"));
+const lms_routes_1 = __importDefault(require("./lms.routes"));
 const router = (0, express_1.Router)();
 const allowedOrigins = [
     'http://localhost:3000',
@@ -57,5 +58,6 @@ router.use('/teams', team_routes_1.default);
 router.use('/feedback', feedback_routes_1.default);
 router.use('/organization', organization_routes_1.default);
 router.use('/survey', survey_routes_1.default);
+router.use('/lms', lms_routes_1.default);
 exports.default = router;
 //# sourceMappingURL=index.js.map

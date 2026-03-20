@@ -132,6 +132,22 @@ class LmsProgressService {
 
     const totalLevels = levels.length;
     const levelIds = levels.map(level => level.id);
+
+    if (levelIds.length) {
+      // Data consistency repair: completedAt implies completed status.
+      await prisma.lmsUserLevelProgress.updateMany({
+        where: {
+          userId,
+          levelId: { in: levelIds },
+          completedAt: { not: null },
+          status: { not: LmsProgressStatus.COMPLETED },
+        },
+        data: {
+          status: LmsProgressStatus.COMPLETED,
+        },
+      });
+    }
+
     const completedLevels = levelIds.length
       ? await prisma.lmsUserLevelProgress.count({
           where: {
@@ -306,7 +322,7 @@ class LmsProgressService {
       throw new HttpException(403, 'This level is locked');
     }
 
-    return prisma.lmsLevel.findUnique({
+    const levelData = await prisma.lmsLevel.findUnique({
       where: { id: levelId },
       include: {
         topic: {
@@ -328,8 +344,32 @@ class LmsProgressService {
             },
           },
         },
+        userProgresses: {
+          where: { userId },
+          take: 1,
+        },
+        attempts: {
+          where: { userId },
+          orderBy: { attemptNumber: 'desc' },
+          take: 1,
+          include: {
+            answers: true,
+          },
+        },
       },
     });
+
+    if (!levelData) {
+      throw new HttpException(404, 'LMS level not found');
+    }
+
+    const { userProgresses, attempts, ...restLevel } = levelData;
+
+    return {
+      ...restLevel,
+      progress: userProgresses?.[0] || null,
+      latestAttempt: attempts?.[0] || null,
+    };
   }
 
   async updateVideoProgress(userId: string, levelId: string, payload: VideoProgressInput) {
@@ -618,19 +658,29 @@ class LmsProgressService {
       });
 
       if (nextLevel) {
-        await tx.lmsUserLevelProgress.upsert({
+        const nextLevelProgress = await tx.lmsUserLevelProgress.findUnique({
           where: { userId_levelId: { userId, levelId: nextLevel.id } },
-          update: {
-            status: LmsProgressStatus.UNLOCKED,
-            unlockedAt: new Date(),
-          },
-          create: {
-            userId,
-            levelId: nextLevel.id,
-            status: LmsProgressStatus.UNLOCKED,
-            unlockedAt: new Date(),
-          },
+          select: { status: true },
         });
+
+        if (!nextLevelProgress) {
+          await tx.lmsUserLevelProgress.create({
+            data: {
+              userId,
+              levelId: nextLevel.id,
+              status: LmsProgressStatus.UNLOCKED,
+              unlockedAt: new Date(),
+            },
+          });
+        } else if (nextLevelProgress.status === LmsProgressStatus.LOCKED) {
+          await tx.lmsUserLevelProgress.update({
+            where: { userId_levelId: { userId, levelId: nextLevel.id } },
+            data: {
+              status: LmsProgressStatus.UNLOCKED,
+              unlockedAt: new Date(),
+            },
+          });
+        }
       }
 
       return {

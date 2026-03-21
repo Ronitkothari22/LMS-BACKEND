@@ -7,6 +7,39 @@ const http_exception_1 = __importDefault(require("../utils/http-exception"));
 const prisma_1 = __importDefault(require("../lib/prisma"));
 const client_1 = require("@prisma/client");
 class LmsTopicService {
+    sanitizeLevelRules(input) {
+        var _a;
+        if (input.requireVideoCompletion && ((_a = input.minVideoWatchPercent) !== null && _a !== void 0 ? _a : 0) <= 0) {
+            return {
+                ...input,
+                minVideoWatchPercent: 100,
+            };
+        }
+        return input;
+    }
+    async resolveVisibilityInput(visibility, sessionId) {
+        if (visibility === 'ALL') {
+            return { visibility, sessionId: null };
+        }
+        if (visibility === 'SESSION' || (typeof visibility === 'undefined' && !!sessionId)) {
+            const targetSessionId = sessionId !== null && sessionId !== void 0 ? sessionId : null;
+            if (!targetSessionId) {
+                throw new http_exception_1.default(400, 'sessionId is required when visibility is SESSION');
+            }
+            const session = await prisma_1.default.session.findUnique({
+                where: { id: targetSessionId },
+                select: { id: true },
+            });
+            if (!session) {
+                throw new http_exception_1.default(400, 'Assigned session not found');
+            }
+            return { visibility: visibility || 'SESSION', sessionId: targetSessionId };
+        }
+        if (sessionId === null) {
+            return { sessionId: null };
+        }
+        return {};
+    }
     async ensureTopicExists(topicId) {
         const topic = await prisma_1.default.lmsTopic.findUnique({
             where: { id: topicId },
@@ -98,9 +131,11 @@ class LmsTopicService {
         throw new http_exception_1.default(501, 'LMS topic service not implemented yet');
     }
     async createTopic(input, createdById) {
+        const resolvedVisibility = await this.resolveVisibilityInput(input.visibility, input.sessionId);
         return prisma_1.default.lmsTopic.create({
             data: {
                 ...input,
+                ...resolvedVisibility,
                 createdById,
             },
             include: {
@@ -196,10 +231,23 @@ class LmsTopicService {
         return topic;
     }
     async updateTopic(topicId, input) {
-        await this.getTopicById(topicId);
+        var _a;
+        const existingTopic = await prisma_1.default.lmsTopic.findUnique({
+            where: { id: topicId },
+            select: { id: true, visibility: true, sessionId: true },
+        });
+        if (!existingTopic) {
+            throw new http_exception_1.default(404, 'LMS topic not found');
+        }
+        const nextVisibility = (_a = input.visibility) !== null && _a !== void 0 ? _a : existingTopic.visibility;
+        const nextSessionId = typeof input.sessionId !== 'undefined' ? input.sessionId : existingTopic.sessionId;
+        const resolvedVisibility = await this.resolveVisibilityInput(nextVisibility, nextSessionId);
         return prisma_1.default.lmsTopic.update({
             where: { id: topicId },
-            data: input,
+            data: {
+                ...input,
+                ...resolvedVisibility,
+            },
             include: {
                 createdBy: {
                     select: {
@@ -225,13 +273,16 @@ class LmsTopicService {
     }
     async createLevel(topicId, input) {
         await this.ensureTopicExists(topicId);
+        const sanitizedInput = this.sanitizeLevelRules(input);
+        const resolvedVisibility = await this.resolveVisibilityInput(sanitizedInput.visibility, sanitizedInput.sessionId);
         try {
             return await prisma_1.default.$transaction(async (tx) => {
-                await this.shiftForCreate(tx, topicId, input.position);
+                await this.shiftForCreate(tx, topicId, sanitizedInput.position);
                 return tx.lmsLevel.create({
                     data: {
                         topicId,
-                        ...input,
+                        ...sanitizedInput,
+                        ...resolvedVisibility,
                     },
                     include: {
                         _count: {
@@ -252,15 +303,29 @@ class LmsTopicService {
         }
     }
     async updateLevel(levelId, input) {
+        var _a;
         const existing = await this.ensureLevelExists(levelId);
+        const sanitizedInput = this.sanitizeLevelRules(input);
+        const existingLevel = await prisma_1.default.lmsLevel.findUnique({
+            where: { id: levelId },
+            select: { visibility: true, sessionId: true },
+        });
+        const nextVisibility = (_a = sanitizedInput.visibility) !== null && _a !== void 0 ? _a : existingLevel === null || existingLevel === void 0 ? void 0 : existingLevel.visibility;
+        const nextSessionId = typeof sanitizedInput.sessionId !== 'undefined'
+            ? sanitizedInput.sessionId
+            : existingLevel === null || existingLevel === void 0 ? void 0 : existingLevel.sessionId;
+        const resolvedVisibility = await this.resolveVisibilityInput(nextVisibility, nextSessionId);
         try {
             return await prisma_1.default.$transaction(async (tx) => {
-                if (typeof input.position === 'number' && input.position !== existing.position) {
-                    await this.shiftForMove(tx, existing.topicId, existing.position, input.position);
+                if (typeof sanitizedInput.position === 'number' && sanitizedInput.position !== existing.position) {
+                    await this.shiftForMove(tx, existing.topicId, existing.position, sanitizedInput.position);
                 }
                 return tx.lmsLevel.update({
                     where: { id: levelId },
-                    data: input,
+                    data: {
+                        ...sanitizedInput,
+                        ...resolvedVisibility,
+                    },
                     include: {
                         _count: {
                             select: {

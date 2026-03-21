@@ -95,6 +95,8 @@ model Session {
   feedbacks       Feedback[]               @relation("SessionFeedbacks") // Session feedbacks
   surveys         Survey[]                 @relation("SessionSurveys") // Session surveys
   organizations   Organization[]           @relation("SessionOrganizations") // Session organizations
+  lmsTopics       LmsTopic[]
+  lmsLevels       LmsLevel[]
   createdAt       DateTime                 @default(now())
   updatedAt       DateTime                 @updatedAt
 }
@@ -660,11 +662,19 @@ enum LmsLeaderboardScope {
   TOPIC
 }
 
+enum LmsVisibility {
+  ALL
+  SESSION
+}
+
 model LmsTopic {
   id                       String                   @id @default(uuid())
   title                    String
   description              String?
   slug                     String?                  @unique
+  visibility               LmsVisibility            @default(ALL)
+  session                  Session?                 @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  sessionId                String?
   isPublished              Boolean                  @default(false)
   isActive                 Boolean                  @default(true)
   position                 Int?
@@ -681,12 +691,16 @@ model LmsTopic {
   updatedAt                DateTime                 @updatedAt
 
   @@index([createdById, createdAt])
+  @@index([visibility, sessionId])
 }
 
 model LmsLevel {
   id                           String                 @id @default(uuid())
   topic                        LmsTopic               @relation("LmsTopicLevels", fields: [topicId], references: [id], onDelete: Cascade)
   topicId                      String
+  visibility                   LmsVisibility          @default(ALL)
+  session                      Session?               @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  sessionId                    String?
   title                        String
   description                  String?
   position                     Int
@@ -708,6 +722,7 @@ model LmsLevel {
 
   @@unique([topicId, position])
   @@index([topicId, isPublished])
+  @@index([visibility, sessionId])
 }
 
 model LmsLevelContent {

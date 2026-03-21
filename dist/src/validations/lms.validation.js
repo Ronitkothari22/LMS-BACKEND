@@ -3,14 +3,27 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.levelAttemptAnalyticsSchema = exports.videoAnalyticsSchema = exports.topicAnalyticsSchema = exports.topicLeaderboardSchema = exports.completeLevelSchema = exports.createLevelAttemptSchema = exports.updateVideoProgressSchema = exports.getMyLevelByIdSchema = exports.updateQuestionSchema = exports.questionIdParamSchema = exports.addLevelQuestionsSchema = exports.updateLevelContentSchema = exports.contentIdParamSchema = exports.addLevelReadingContentSchema = exports.addLevelVideoContentSchema = exports.updateLevelSchema = exports.levelIdParamSchema = exports.createLevelSchema = exports.updateTopicSchema = exports.topicIdParamSchema = exports.getTopicsSchema = exports.createTopicSchema = void 0;
 const zod_1 = require("zod");
 const uuidParam = zod_1.z.string().uuid('Invalid ID format');
+const lmsVisibilitySchema = zod_1.z.enum(['ALL', 'SESSION']);
 exports.createTopicSchema = zod_1.z.object({
-    body: zod_1.z.object({
+    body: zod_1.z
+        .object({
         title: zod_1.z.string().min(2, 'Title must be at least 2 characters'),
         description: zod_1.z.string().optional(),
         slug: zod_1.z.string().min(2).optional(),
+        visibility: lmsVisibilitySchema.optional(),
+        sessionId: uuidParam.optional(),
         isPublished: zod_1.z.boolean().optional(),
         position: zod_1.z.number().int().nonnegative().optional(),
         estimatedDurationMinutes: zod_1.z.number().int().positive().optional(),
+    })
+        .superRefine((body, ctx) => {
+        if (body.visibility === 'SESSION' && !body.sessionId) {
+            ctx.addIssue({
+                code: zod_1.z.ZodIssueCode.custom,
+                path: ['sessionId'],
+                message: 'sessionId is required when visibility is SESSION',
+            });
+        }
     }),
 });
 exports.getTopicsSchema = zod_1.z.object({
@@ -32,6 +45,8 @@ exports.updateTopicSchema = zod_1.z.object({
         title: zod_1.z.string().min(2).optional(),
         description: zod_1.z.string().optional(),
         slug: zod_1.z.string().min(2).optional(),
+        visibility: lmsVisibilitySchema.optional(),
+        sessionId: zod_1.z.union([uuidParam, zod_1.z.null()]).optional(),
         isPublished: zod_1.z.boolean().optional(),
         isActive: zod_1.z.boolean().optional(),
         position: zod_1.z.number().int().nonnegative().optional(),
@@ -42,10 +57,13 @@ exports.createLevelSchema = zod_1.z.object({
     params: zod_1.z.object({
         topicId: uuidParam,
     }),
-    body: zod_1.z.object({
+    body: zod_1.z
+        .object({
         title: zod_1.z.string().min(2),
         description: zod_1.z.string().optional(),
         position: zod_1.z.number().int().nonnegative(),
+        visibility: lmsVisibilitySchema.optional(),
+        sessionId: uuidParam.optional(),
         isPublished: zod_1.z.boolean().optional(),
         requireVideoCompletion: zod_1.z.boolean().optional(),
         minVideoWatchPercent: zod_1.z.number().min(0).max(100).optional(),
@@ -53,6 +71,15 @@ exports.createLevelSchema = zod_1.z.object({
         quizPassingPercent: zod_1.z.number().min(0).max(100).optional(),
         requireReadingAcknowledgement: zod_1.z.boolean().optional(),
         xpOnCompletion: zod_1.z.number().int().nonnegative().optional(),
+    })
+        .superRefine((body, ctx) => {
+        if (body.visibility === 'SESSION' && !body.sessionId) {
+            ctx.addIssue({
+                code: zod_1.z.ZodIssueCode.custom,
+                path: ['sessionId'],
+                message: 'sessionId is required when visibility is SESSION',
+            });
+        }
     }),
 });
 exports.levelIdParamSchema = zod_1.z.object({
@@ -68,6 +95,8 @@ exports.updateLevelSchema = zod_1.z.object({
         title: zod_1.z.string().min(2).optional(),
         description: zod_1.z.string().optional(),
         position: zod_1.z.number().int().nonnegative().optional(),
+        visibility: lmsVisibilitySchema.optional(),
+        sessionId: zod_1.z.union([uuidParam, zod_1.z.null()]).optional(),
         isPublished: zod_1.z.boolean().optional(),
         requireVideoCompletion: zod_1.z.boolean().optional(),
         minVideoWatchPercent: zod_1.z.number().min(0).max(100).optional(),

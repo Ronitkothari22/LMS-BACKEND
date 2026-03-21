@@ -1,9 +1,12 @@
 export type LmsQuestionType = 'SINGLE_CHOICE' | 'MULTIPLE_CORRECT' | 'TEXT';
+export type LmsVisibility = 'ALL' | 'SESSION';
 
 export interface CreateLmsTopicInput {
   title: string;
   description?: string;
   slug?: string;
+  visibility?: LmsVisibility;
+  sessionId?: string;
   isPublished?: boolean;
   position?: number;
   estimatedDurationMinutes?: number;
@@ -13,6 +16,8 @@ export interface UpdateLmsTopicInput {
   title?: string;
   description?: string;
   slug?: string;
+  visibility?: LmsVisibility;
+  sessionId?: string | null;
   isPublished?: boolean;
   isActive?: boolean;
   position?: number;
@@ -23,6 +28,8 @@ export interface CreateLmsLevelInput {
   title: string;
   description?: string;
   position: number;
+  visibility?: LmsVisibility;
+  sessionId?: string;
   isPublished?: boolean;
   requireVideoCompletion?: boolean;
   minVideoWatchPercent?: number;
@@ -36,6 +43,8 @@ export interface UpdateLmsLevelInput {
   title?: string;
   description?: string;
   position?: number;
+  visibility?: LmsVisibility;
+  sessionId?: string | null;
   isPublished?: boolean;
   requireVideoCompletion?: boolean;
   minVideoWatchPercent?: number;

@@ -11,16 +11,50 @@ class LmsProgressService {
     async notImplemented() {
         throw new http_exception_1.default(501, 'LMS progress service not implemented yet');
     }
-    async ensureLearnerTopicAccessible(topicId) {
+    topicVisibilityWhere(userId) {
+        return {
+            OR: [
+                { visibility: 'ALL' },
+                {
+                    visibility: 'SESSION',
+                    session: {
+                        participants: {
+                            some: { id: userId },
+                        },
+                    },
+                },
+            ],
+        };
+    }
+    levelVisibilityWhere(userId) {
+        return {
+            OR: [
+                { visibility: 'ALL' },
+                {
+                    visibility: 'SESSION',
+                    session: {
+                        participants: {
+                            some: { id: userId },
+                        },
+                    },
+                },
+            ],
+        };
+    }
+    async ensureLearnerTopicAccessible(userId, topicId) {
         const topic = await prisma_1.default.lmsTopic.findFirst({
             where: {
                 id: topicId,
                 isActive: true,
                 isPublished: true,
+                ...this.topicVisibilityWhere(userId),
             },
             include: {
                 levels: {
-                    where: { isPublished: true },
+                    where: {
+                        isPublished: true,
+                        ...this.levelVisibilityWhere(userId),
+                    },
                     orderBy: { position: 'asc' },
                     select: { id: true, position: true },
                 },
@@ -31,21 +65,26 @@ class LmsProgressService {
         }
         return topic;
     }
-    async ensureLearnerLevelAccessible(levelId) {
+    async ensureLearnerLevelAccessible(userId, levelId) {
         const level = await prisma_1.default.lmsLevel.findFirst({
             where: {
                 id: levelId,
                 isPublished: true,
+                ...this.levelVisibilityWhere(userId),
                 topic: {
                     isActive: true,
                     isPublished: true,
+                    ...this.topicVisibilityWhere(userId),
                 },
             },
             include: {
                 topic: {
                     include: {
                         levels: {
-                            where: { isPublished: true },
+                            where: {
+                                isPublished: true,
+                                ...this.levelVisibilityWhere(userId),
+                            },
                             orderBy: { position: 'asc' },
                             select: { id: true, position: true },
                         },
@@ -59,7 +98,7 @@ class LmsProgressService {
         return level;
     }
     async initializeTopicProgressForUser(userId, topicId) {
-        const topic = await this.ensureLearnerTopicAccessible(topicId);
+        const topic = await this.ensureLearnerTopicAccessible(userId, topicId);
         const levels = topic.levels;
         if (levels.length === 0) {
             await prisma_1.default.lmsUserTopicProgress.upsert({
@@ -115,7 +154,11 @@ class LmsProgressService {
     }
     async refreshTopicProgress(userId, topicId) {
         const levels = await prisma_1.default.lmsLevel.findMany({
-            where: { topicId, isPublished: true },
+            where: {
+                topicId,
+                isPublished: true,
+                ...this.levelVisibilityWhere(userId),
+            },
             select: { id: true },
         });
         const totalLevels = levels.length;
@@ -188,8 +231,13 @@ class LmsProgressService {
             where: { userId_levelId: { userId, levelId } },
             select: { watchPercent: true, latestScorePercent: true },
         });
+        const requiredVideoWatchPercent = level.requireVideoCompletion
+            ? level.minVideoWatchPercent > 0
+                ? level.minVideoWatchPercent
+                : 100
+            : 0;
         const videoPassed = !level.requireVideoCompletion ||
-            ((_a = progress === null || progress === void 0 ? void 0 : progress.watchPercent) !== null && _a !== void 0 ? _a : 0) >= level.minVideoWatchPercent;
+            ((_a = progress === null || progress === void 0 ? void 0 : progress.watchPercent) !== null && _a !== void 0 ? _a : 0) >= requiredVideoWatchPercent;
         const quizPassed = !level.requireQuizPass ||
             ((_b = progress === null || progress === void 0 ? void 0 : progress.latestScorePercent) !== null && _b !== void 0 ? _b : 0) >= level.quizPassingPercent;
         return {
@@ -199,7 +247,7 @@ class LmsProgressService {
             canComplete: videoPassed && quizPassed,
             reasons: {
                 requireVideoCompletion: level.requireVideoCompletion,
-                minVideoWatchPercent: level.minVideoWatchPercent,
+                minVideoWatchPercent: requiredVideoWatchPercent,
                 currentWatchPercent: (_c = progress === null || progress === void 0 ? void 0 : progress.watchPercent) !== null && _c !== void 0 ? _c : 0,
                 requireQuizPass: level.requireQuizPass,
                 quizPassingPercent: level.quizPassingPercent,
@@ -212,11 +260,15 @@ class LmsProgressService {
             where: {
                 isPublished: true,
                 isActive: true,
+                ...this.topicVisibilityWhere(userId),
             },
             orderBy: [{ position: 'asc' }, { createdAt: 'desc' }],
             include: {
                 levels: {
-                    where: { isPublished: true },
+                    where: {
+                        isPublished: true,
+                        ...this.levelVisibilityWhere(userId),
+                    },
                     orderBy: { position: 'asc' },
                     select: {
                         id: true,
@@ -246,7 +298,11 @@ class LmsProgressService {
         const topic = await this.initializeTopicProgressForUser(userId, topicId);
         await this.refreshTopicProgress(userId, topicId);
         const levels = await prisma_1.default.lmsLevel.findMany({
-            where: { topicId, isPublished: true },
+            where: {
+                topicId,
+                isPublished: true,
+                ...this.levelVisibilityWhere(userId),
+            },
             orderBy: { position: 'asc' },
             include: {
                 _count: {
@@ -277,7 +333,7 @@ class LmsProgressService {
         };
     }
     async getMyLevelById(userId, levelId) {
-        const level = await this.ensureLearnerLevelAccessible(levelId);
+        const level = await this.ensureLearnerLevelAccessible(userId, levelId);
         await this.initializeTopicProgressForUser(userId, level.topicId);
         const progress = await prisma_1.default.lmsUserLevelProgress.findUnique({
             where: { userId_levelId: { userId, levelId } },
@@ -333,7 +389,7 @@ class LmsProgressService {
     }
     async updateVideoProgress(userId, levelId, payload) {
         var _a, _b, _c, _d;
-        const level = await this.ensureLearnerLevelAccessible(levelId);
+        const level = await this.ensureLearnerLevelAccessible(userId, levelId);
         await this.initializeTopicProgressForUser(userId, level.topicId);
         const levelProgress = await prisma_1.default.lmsUserLevelProgress.findUnique({
             where: { userId_levelId: { userId, levelId } },
@@ -393,7 +449,7 @@ class LmsProgressService {
         return { event, progress: updatedProgress };
     }
     async createLevelAttempt(userId, levelId, payload) {
-        const level = await this.ensureLearnerLevelAccessible(levelId);
+        const level = await this.ensureLearnerLevelAccessible(userId, levelId);
         await this.initializeTopicProgressForUser(userId, level.topicId);
         const levelProgress = await prisma_1.default.lmsUserLevelProgress.findUnique({
             where: { userId_levelId: { userId, levelId } },
@@ -531,7 +587,7 @@ class LmsProgressService {
         };
     }
     async completeLevel(userId, levelId, force = false) {
-        const level = await this.ensureLearnerLevelAccessible(levelId);
+        const level = await this.ensureLearnerLevelAccessible(userId, levelId);
         await this.initializeTopicProgressForUser(userId, level.topicId);
         const levelProgress = await prisma_1.default.lmsUserLevelProgress.findUnique({
             where: { userId_levelId: { userId, levelId } },
@@ -567,6 +623,7 @@ class LmsProgressService {
                 where: {
                     topicId: level.topicId,
                     isPublished: true,
+                    ...this.levelVisibilityWhere(userId),
                     position: { gt: level.position },
                 },
                 orderBy: { position: 'asc' },

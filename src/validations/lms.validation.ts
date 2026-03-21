@@ -1,16 +1,29 @@
 import { z } from 'zod';
 
 const uuidParam = z.string().uuid('Invalid ID format');
+const lmsVisibilitySchema = z.enum(['ALL', 'SESSION']);
 
 export const createTopicSchema = z.object({
-  body: z.object({
-    title: z.string().min(2, 'Title must be at least 2 characters'),
-    description: z.string().optional(),
-    slug: z.string().min(2).optional(),
-    isPublished: z.boolean().optional(),
-    position: z.number().int().nonnegative().optional(),
-    estimatedDurationMinutes: z.number().int().positive().optional(),
-  }),
+  body: z
+    .object({
+      title: z.string().min(2, 'Title must be at least 2 characters'),
+      description: z.string().optional(),
+      slug: z.string().min(2).optional(),
+      visibility: lmsVisibilitySchema.optional(),
+      sessionId: uuidParam.optional(),
+      isPublished: z.boolean().optional(),
+      position: z.number().int().nonnegative().optional(),
+      estimatedDurationMinutes: z.number().int().positive().optional(),
+    })
+    .superRefine((body, ctx) => {
+      if (body.visibility === 'SESSION' && !body.sessionId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['sessionId'],
+          message: 'sessionId is required when visibility is SESSION',
+        });
+      }
+    }),
 });
 
 export const getTopicsSchema = z.object({
@@ -34,6 +47,8 @@ export const updateTopicSchema = z.object({
     title: z.string().min(2).optional(),
     description: z.string().optional(),
     slug: z.string().min(2).optional(),
+    visibility: lmsVisibilitySchema.optional(),
+    sessionId: z.union([uuidParam, z.null()]).optional(),
     isPublished: z.boolean().optional(),
     isActive: z.boolean().optional(),
     position: z.number().int().nonnegative().optional(),
@@ -45,18 +60,30 @@ export const createLevelSchema = z.object({
   params: z.object({
     topicId: uuidParam,
   }),
-  body: z.object({
-    title: z.string().min(2),
-    description: z.string().optional(),
-    position: z.number().int().nonnegative(),
-    isPublished: z.boolean().optional(),
-    requireVideoCompletion: z.boolean().optional(),
-    minVideoWatchPercent: z.number().min(0).max(100).optional(),
-    requireQuizPass: z.boolean().optional(),
-    quizPassingPercent: z.number().min(0).max(100).optional(),
-    requireReadingAcknowledgement: z.boolean().optional(),
-    xpOnCompletion: z.number().int().nonnegative().optional(),
-  }),
+  body: z
+    .object({
+      title: z.string().min(2),
+      description: z.string().optional(),
+      position: z.number().int().nonnegative(),
+      visibility: lmsVisibilitySchema.optional(),
+      sessionId: uuidParam.optional(),
+      isPublished: z.boolean().optional(),
+      requireVideoCompletion: z.boolean().optional(),
+      minVideoWatchPercent: z.number().min(0).max(100).optional(),
+      requireQuizPass: z.boolean().optional(),
+      quizPassingPercent: z.number().min(0).max(100).optional(),
+      requireReadingAcknowledgement: z.boolean().optional(),
+      xpOnCompletion: z.number().int().nonnegative().optional(),
+    })
+    .superRefine((body, ctx) => {
+      if (body.visibility === 'SESSION' && !body.sessionId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['sessionId'],
+          message: 'sessionId is required when visibility is SESSION',
+        });
+      }
+    }),
 });
 
 export const levelIdParamSchema = z.object({
@@ -73,6 +100,8 @@ export const updateLevelSchema = z.object({
     title: z.string().min(2).optional(),
     description: z.string().optional(),
     position: z.number().int().nonnegative().optional(),
+    visibility: lmsVisibilitySchema.optional(),
+    sessionId: z.union([uuidParam, z.null()]).optional(),
     isPublished: z.boolean().optional(),
     requireVideoCompletion: z.boolean().optional(),
     minVideoWatchPercent: z.number().min(0).max(100).optional(),

@@ -232,6 +232,103 @@ class LmsProgressService {
     });
   }
 
+  private async evaluateRequiredContentProgress(
+    userId: string,
+    levelId: string,
+    requiredVideoWatchPercent: number,
+    requireVideoCompletion: boolean,
+    requireReadingAcknowledgement: boolean,
+  ) {
+    const requiredContents = await prisma.lmsLevelContent.findMany({
+      where: {
+        levelId,
+        isRequired: true,
+        type: {
+          in: ['VIDEO', 'READING'],
+        },
+      },
+      select: {
+        id: true,
+        type: true,
+      },
+    });
+
+    const requiredVideos = requiredContents.filter(item => item.type === 'VIDEO').map(item => item.id);
+    const requiredReadings = requiredContents
+      .filter(item => item.type === 'READING')
+      .map(item => item.id);
+    const relevantContentIds = [...requiredVideos, ...requiredReadings];
+
+    const events = relevantContentIds.length
+      ? await prisma.lmsVideoWatchEvent.findMany({
+          where: {
+            userId,
+            levelId,
+            contentId: { in: relevantContentIds },
+          },
+          select: {
+            contentId: true,
+            eventType: true,
+            watchPercent: true,
+          },
+        })
+      : [];
+
+    const maxWatchByContent = new Map<string, number>();
+    const completedByContent = new Set<string>();
+
+    for (const event of events) {
+      const contentId = event.contentId;
+      if (!contentId) continue;
+
+      const existingMax = maxWatchByContent.get(contentId) ?? 0;
+      if (event.watchPercent > existingMax) {
+        maxWatchByContent.set(contentId, event.watchPercent);
+      }
+
+      if (event.eventType === 'COMPLETE' || event.watchPercent >= 100) {
+        completedByContent.add(contentId);
+      }
+    }
+
+    const completedRequiredVideos = requiredVideos.filter(contentId => {
+      const maxWatch = maxWatchByContent.get(contentId) ?? 0;
+      return completedByContent.has(contentId) || maxWatch >= requiredVideoWatchPercent;
+    }).length;
+
+    const completedRequiredReadings = requiredReadings.filter(contentId =>
+      completedByContent.has(contentId),
+    ).length;
+
+    const currentVideoWatchPercent =
+      requiredVideos.length > 0
+        ? Number(
+            (
+              requiredVideos.reduce((sum, contentId) => sum + (maxWatchByContent.get(contentId) ?? 0), 0) /
+              requiredVideos.length
+            ).toFixed(2),
+          )
+        : 0;
+
+    const requiredGateItems =
+      (requireVideoCompletion ? requiredVideos.length : 0) +
+      (requireReadingAcknowledgement ? requiredReadings.length : 0);
+    const completedGateItems =
+      (requireVideoCompletion ? completedRequiredVideos : 0) +
+      (requireReadingAcknowledgement ? completedRequiredReadings : 0);
+    const currentContentGatePercent =
+      requiredGateItems > 0 ? Number(((completedGateItems / requiredGateItems) * 100).toFixed(2)) : 100;
+
+    return {
+      requiredVideos: requiredVideos.length,
+      completedRequiredVideos,
+      requiredReadings: requiredReadings.length,
+      completedRequiredReadings,
+      currentVideoWatchPercent,
+      currentContentGatePercent,
+    };
+  }
+
   private async evaluateCompletionRules(userId: string, levelId: string) {
     const level = await prisma.lmsLevel.findUnique({
       where: { id: levelId },
@@ -239,6 +336,7 @@ class LmsProgressService {
         id: true,
         requireVideoCompletion: true,
         minVideoWatchPercent: true,
+        requireReadingAcknowledgement: true,
         requireQuizPass: true,
         quizPassingPercent: true,
       },
@@ -259,9 +357,22 @@ class LmsProgressService {
         : 100
       : 0;
 
+    const contentProgress = await this.evaluateRequiredContentProgress(
+      userId,
+      levelId,
+      requiredVideoWatchPercent,
+      level.requireVideoCompletion,
+      level.requireReadingAcknowledgement,
+    );
+
     const videoPassed =
       !level.requireVideoCompletion ||
-      (progress?.watchPercent ?? 0) >= requiredVideoWatchPercent;
+      contentProgress.requiredVideos === 0 ||
+      contentProgress.completedRequiredVideos >= contentProgress.requiredVideos;
+    const readingPassed =
+      !level.requireReadingAcknowledgement ||
+      contentProgress.requiredReadings === 0 ||
+      contentProgress.completedRequiredReadings >= contentProgress.requiredReadings;
     const quizPassed =
       !level.requireQuizPass ||
       (progress?.latestScorePercent ?? 0) >= level.quizPassingPercent;
@@ -269,12 +380,20 @@ class LmsProgressService {
     return {
       level,
       videoPassed,
+      readingPassed,
       quizPassed,
-      canComplete: videoPassed && quizPassed,
+      contentPassed: videoPassed && readingPassed,
+      canComplete: videoPassed && readingPassed && quizPassed,
       reasons: {
         requireVideoCompletion: level.requireVideoCompletion,
         minVideoWatchPercent: requiredVideoWatchPercent,
-        currentWatchPercent: progress?.watchPercent ?? 0,
+        currentWatchPercent: contentProgress.currentVideoWatchPercent,
+        requiredVideos: contentProgress.requiredVideos,
+        completedRequiredVideos: contentProgress.completedRequiredVideos,
+        requireReadingAcknowledgement: level.requireReadingAcknowledgement,
+        requiredReadings: contentProgress.requiredReadings,
+        completedRequiredReadings: contentProgress.completedRequiredReadings,
+        currentContentGatePercent: contentProgress.currentContentGatePercent,
         requireQuizPass: level.requireQuizPass,
         quizPassingPercent: level.quizPassingPercent,
         currentScorePercent: progress?.latestScorePercent ?? 0,
@@ -422,12 +541,65 @@ class LmsProgressService {
       throw new HttpException(404, 'LMS level not found');
     }
 
+    const contentIds = (levelData.contents || []).map(content => content.id);
+    const contentEvents = contentIds.length
+      ? await prisma.lmsVideoWatchEvent.findMany({
+          where: {
+            userId,
+            levelId,
+            contentId: { in: contentIds },
+          },
+          select: {
+            contentId: true,
+            eventType: true,
+            watchPercent: true,
+          },
+        })
+      : [];
+
+    const completionByContentId = new Map<
+      string,
+      {
+        isCompleted: boolean;
+        maxWatchPercent: number;
+      }
+    >();
+
+    for (const event of contentEvents) {
+      if (!event.contentId) continue;
+      const existing = completionByContentId.get(event.contentId) || {
+        isCompleted: false,
+        maxWatchPercent: 0,
+      };
+
+      const maxWatchPercent = Math.max(existing.maxWatchPercent, event.watchPercent || 0);
+      const isCompleted =
+        existing.isCompleted || event.eventType === 'COMPLETE' || maxWatchPercent >= 100;
+
+      completionByContentId.set(event.contentId, {
+        isCompleted,
+        maxWatchPercent,
+      });
+    }
+
+    const contentsWithCompletion = (levelData.contents || []).map(content => {
+      const completion = completionByContentId.get(content.id);
+      return {
+        ...content,
+        isCompleted: completion?.isCompleted || false,
+        completionPercent: completion?.maxWatchPercent || 0,
+      };
+    });
+
+    const completionRules = await this.evaluateCompletionRules(userId, levelId);
     const { userProgresses, attempts, ...restLevel } = levelData;
 
     return {
       ...restLevel,
+      contents: contentsWithCompletion,
       progress: userProgresses?.[0] || null,
       latestAttempt: attempts?.[0] || null,
+      completionRules,
     };
   }
 
@@ -478,6 +650,16 @@ class LmsProgressService {
       }),
     ]);
 
+    const refreshedEvaluation = await this.evaluateCompletionRules(userId, levelId);
+    const gatedWatchPercent = refreshedEvaluation.reasons.currentContentGatePercent;
+    const normalizedProgress =
+      typeof gatedWatchPercent === 'number' && updatedProgress.watchPercent !== gatedWatchPercent
+        ? await prisma.lmsUserLevelProgress.update({
+            where: { userId_levelId: { userId, levelId } },
+            data: { watchPercent: gatedWatchPercent },
+          })
+        : updatedProgress;
+
     // Award one-time video completion XP when user completes video for this level.
     if (payload.eventType === 'COMPLETE' && levelProgress.watchPercent < 100 && watchPercent >= 100) {
       const existingVideoXp = await prisma.lmsXpLedger.count({
@@ -502,7 +684,7 @@ class LmsProgressService {
 
     await this.refreshTopicProgress(userId, level.topicId);
 
-    return { event, progress: updatedProgress };
+    return { event, progress: normalizedProgress };
   }
 
   async createLevelAttempt(userId: string, levelId: string, payload: CreateLmsAttemptInput) {
@@ -515,6 +697,14 @@ class LmsProgressService {
 
     if (!levelProgress || levelProgress.status === LmsProgressStatus.LOCKED) {
       throw new HttpException(403, 'This level is locked');
+    }
+
+    const evaluation = await this.evaluateCompletionRules(userId, levelId);
+    if (!evaluation.contentPassed) {
+      throw new HttpException(
+        400,
+        'Complete all required video/reading content before attempting the quiz',
+      );
     }
 
     const questions = await prisma.lmsQuestion.findMany({

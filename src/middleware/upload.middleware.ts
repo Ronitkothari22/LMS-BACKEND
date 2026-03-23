@@ -27,6 +27,9 @@ const contentFileFilter = (
   file: Express.Multer.File,
   cb: multer.FileFilterCallback,
 ) => {
+  const originalName = file.originalname?.toLowerCase() || '';
+  const isPdfByExtension = originalName.endsWith('.pdf');
+
   // Allow images
   if (file.mimetype.startsWith('image/')) {
     cb(null, true);
@@ -36,7 +39,11 @@ const contentFileFilter = (
     cb(null, true);
   }
   // Allow PDFs
-  else if (file.mimetype === 'application/pdf') {
+  else if (
+    file.mimetype === 'application/pdf' ||
+    file.mimetype === 'application/x-pdf' ||
+    ((file.mimetype === 'application/octet-stream' || file.mimetype === '') && isPdfByExtension)
+  ) {
     cb(null, true);
   }
   // Allow PowerPoint files (.pptx and .ppt)

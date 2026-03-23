@@ -4,6 +4,25 @@ exports.levelAttemptAnalyticsSchema = exports.videoAnalyticsSchema = exports.top
 const zod_1 = require("zod");
 const uuidParam = zod_1.z.string().uuid('Invalid ID format');
 const lmsVisibilitySchema = zod_1.z.enum(['ALL', 'SESSION']);
+const coerceBoolean = zod_1.z.preprocess(value => {
+    if (typeof value === 'boolean')
+        return value;
+    if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === 'true')
+            return true;
+        if (normalized === 'false')
+            return false;
+    }
+    return value;
+}, zod_1.z.boolean());
+const coerceNonNegativeInt = zod_1.z.preprocess(value => {
+    if (typeof value === 'number')
+        return value;
+    if (typeof value === 'string' && value.trim() !== '')
+        return Number(value);
+    return value;
+}, zod_1.z.number().int().nonnegative());
 exports.createTopicSchema = zod_1.z.object({
     body: zod_1.z
         .object({
@@ -130,8 +149,8 @@ exports.addLevelReadingContentSchema = zod_1.z.object({
         description: zod_1.z.string().optional(),
         attachmentUrl: zod_1.z.string().url().optional(),
         externalUrl: zod_1.z.string().url().optional(),
-        isRequired: zod_1.z.boolean().optional(),
-        position: zod_1.z.number().int().nonnegative(),
+        isRequired: coerceBoolean.optional(),
+        position: coerceNonNegativeInt,
     }),
 });
 exports.contentIdParamSchema = zod_1.z.object({

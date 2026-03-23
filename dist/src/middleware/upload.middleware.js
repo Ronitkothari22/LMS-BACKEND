@@ -18,13 +18,18 @@ const csvFileFilter = (_req, file, cb) => {
     }
 };
 const contentFileFilter = (_req, file, cb) => {
+    var _a;
+    const originalName = ((_a = file.originalname) === null || _a === void 0 ? void 0 : _a.toLowerCase()) || '';
+    const isPdfByExtension = originalName.endsWith('.pdf');
     if (file.mimetype.startsWith('image/')) {
         cb(null, true);
     }
     else if (file.mimetype.startsWith('video/')) {
         cb(null, true);
     }
-    else if (file.mimetype === 'application/pdf') {
+    else if (file.mimetype === 'application/pdf' ||
+        file.mimetype === 'application/x-pdf' ||
+        ((file.mimetype === 'application/octet-stream' || file.mimetype === '') && isPdfByExtension)) {
         cb(null, true);
     }
     else if (file.mimetype === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||

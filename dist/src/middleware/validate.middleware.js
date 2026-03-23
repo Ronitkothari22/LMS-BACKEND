@@ -8,12 +8,16 @@ const zod_1 = require("zod");
 const logger_config_1 = __importDefault(require("../config/logger.config"));
 const validateRequest = (schema) => {
     return async (req, res, next) => {
+        var _a, _b, _c;
         try {
-            await schema.parseAsync({
+            const parsed = await schema.parseAsync({
                 body: req.body,
                 query: req.query,
                 params: req.params,
             });
+            req.body = (_a = parsed.body) !== null && _a !== void 0 ? _a : req.body;
+            req.query = (_b = parsed.query) !== null && _b !== void 0 ? _b : req.query;
+            req.params = (_c = parsed.params) !== null && _c !== void 0 ? _c : req.params;
             next();
         }
         catch (error) {

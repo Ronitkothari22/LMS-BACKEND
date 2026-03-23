@@ -245,6 +245,12 @@ class LmsContentService {
 
   async addReadingContent(levelId: string, input: CreateLmsReadingContentInput) {
     await this.ensureLevelExists(levelId);
+    if (!input.attachmentUrl && !input.externalUrl) {
+      throw new HttpException(
+        400,
+        'Either attachmentUrl or externalUrl is required for reading content',
+      );
+    }
 
     return prisma.$transaction(async tx => {
       await this.shiftContentPositionsForCreate(tx, levelId, input.position);

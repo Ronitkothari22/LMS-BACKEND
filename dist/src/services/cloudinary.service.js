@@ -7,8 +7,8 @@ exports.deleteFromCloudinary = exports.uploadToCloudinary = void 0;
 const cloudinary_config_1 = __importDefault(require("../config/cloudinary.config"));
 const logger_config_1 = __importDefault(require("../config/logger.config"));
 const stream_1 = require("stream");
-const uploadToCloudinary = async (file, folder, contentType, originalName, onProgress) => {
-    var _a;
+const uploadToCloudinary = async (file, folder, contentType, originalName, onProgress, options) => {
+    var _a, _b;
     try {
         let resourceType = 'auto';
         if (contentType === 'VIDEO') {
@@ -53,10 +53,13 @@ const uploadToCloudinary = async (file, folder, contentType, originalName, onPro
                 }
             }
         }
+        const forceAttachment = (_b = options === null || options === void 0 ? void 0 : options.forceAttachment) !== null && _b !== void 0 ? _b : true;
         if (contentType === 'PDF' && originalName) {
             uploadOptions.use_filename = true;
             uploadOptions.unique_filename = true;
-            uploadOptions.flags = 'attachment';
+            if (forceAttachment) {
+                uploadOptions.flags = 'attachment';
+            }
         }
         if (originalName && !uploadOptions.use_filename) {
             uploadOptions.use_filename = true;

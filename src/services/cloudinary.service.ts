@@ -33,6 +33,9 @@ export const uploadToCloudinary = async (
   contentType: ContentType,
   originalName?: string,
   onProgress?: (progress: UploadProgress) => void,
+  options?: {
+    forceAttachment?: boolean;
+  },
 ): Promise<CloudinaryUploadResult> => {
   try {
     // Set resource type based on content type
@@ -84,11 +87,15 @@ export const uploadToCloudinary = async (
       }
     }
 
-    // For PDFs, preserve filename and set attachment flag
+    const forceAttachment = options?.forceAttachment ?? true;
+
+    // For PDFs, preserve filename and optionally force attachment download
     if (contentType === 'PDF' && originalName) {
       uploadOptions.use_filename = true;
       uploadOptions.unique_filename = true;
-      uploadOptions.flags = 'attachment';
+      if (forceAttachment) {
+        uploadOptions.flags = 'attachment';
+      }
     }
 
     // For all file types, try to preserve the original filename

@@ -37,6 +37,7 @@ const express_1 = require("express");
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const admin_middleware_1 = require("../middleware/admin.middleware");
 const validate_middleware_1 = require("../middleware/validate.middleware");
+const upload_middleware_1 = require("../middleware/upload.middleware");
 const lmsAdminController = __importStar(require("../controllers/lms-admin.controller"));
 const lmsLearnerController = __importStar(require("../controllers/lms-learner.controller"));
 const lmsAnalyticsController = __importStar(require("../controllers/lms-analytics.controller"));
@@ -53,7 +54,7 @@ router.post('/topics/:topicId/levels', auth_middleware_1.authenticateToken, admi
 router.put('/levels/:levelId', auth_middleware_1.authenticateToken, admin_middleware_1.isAdmin, (0, validate_middleware_1.validateRequest)(lms_validation_1.updateLevelSchema), lmsAdminController.updateLevel);
 router.delete('/levels/:levelId', auth_middleware_1.authenticateToken, admin_middleware_1.isAdmin, (0, validate_middleware_1.validateRequest)(lms_validation_1.levelIdParamSchema), lmsAdminController.deleteLevel);
 router.post('/levels/:levelId/content/video', auth_middleware_1.authenticateToken, admin_middleware_1.isAdmin, (0, validate_middleware_1.validateRequest)(lms_validation_1.addLevelVideoContentSchema), lmsAdminController.addLevelVideoContent);
-router.post('/levels/:levelId/content/reading', auth_middleware_1.authenticateToken, admin_middleware_1.isAdmin, (0, validate_middleware_1.validateRequest)(lms_validation_1.addLevelReadingContentSchema), lmsAdminController.addLevelReadingContent);
+router.post('/levels/:levelId/content/reading', auth_middleware_1.authenticateToken, admin_middleware_1.isAdmin, upload_middleware_1.contentUpload.single('file'), (0, validate_middleware_1.validateRequest)(lms_validation_1.addLevelReadingContentSchema), lmsAdminController.addLevelReadingContent);
 router.put('/content/:contentId', auth_middleware_1.authenticateToken, admin_middleware_1.isAdmin, (0, validate_middleware_1.validateRequest)(lms_validation_1.updateLevelContentSchema), lmsAdminController.updateLevelContent);
 router.delete('/content/:contentId', auth_middleware_1.authenticateToken, admin_middleware_1.isAdmin, (0, validate_middleware_1.validateRequest)(lms_validation_1.contentIdParamSchema), lmsAdminController.deleteLevelContent);
 router.post('/levels/:levelId/questions', auth_middleware_1.authenticateToken, admin_middleware_1.isAdmin, (0, validate_middleware_1.validateRequest)(lms_validation_1.addLevelQuestionsSchema), lmsAdminController.addLevelQuestions);

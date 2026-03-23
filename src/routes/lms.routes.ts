@@ -2,6 +2,7 @@ import { Router, RequestHandler } from 'express';
 import { authenticateToken } from '../middleware/auth.middleware';
 import { isAdmin } from '../middleware/admin.middleware';
 import { validateRequest } from '../middleware/validate.middleware';
+import { contentUpload } from '../middleware/upload.middleware';
 import * as lmsAdminController from '../controllers/lms-admin.controller';
 import * as lmsLearnerController from '../controllers/lms-learner.controller';
 import * as lmsAnalyticsController from '../controllers/lms-analytics.controller';
@@ -125,6 +126,7 @@ router.post(
   '/levels/:levelId/content/reading',
   authenticateToken as RequestHandler,
   isAdmin as RequestHandler,
+  contentUpload.single('file'),
   validateRequest(addLevelReadingContentSchema),
   lmsAdminController.addLevelReadingContent,
 );

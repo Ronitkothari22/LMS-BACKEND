@@ -8,6 +8,9 @@ const lms_topic_service_1 = __importDefault(require("../services/lms-topic.servi
 const lms_content_service_1 = __importDefault(require("../services/lms-content.service"));
 const param_parser_1 = require("../utils/param-parser");
 const logger_config_1 = __importDefault(require("../config/logger.config"));
+const cloudinary_service_1 = require("../services/cloudinary.service");
+const client_1 = require("@prisma/client");
+const http_exception_1 = __importDefault(require("../utils/http-exception"));
 const parseBoolean = (value) => {
     if (typeof value !== 'string')
         return undefined;
@@ -167,9 +170,42 @@ const addLevelVideoContent = async (_req, _res, next) => {
 };
 exports.addLevelVideoContent = addLevelVideoContent;
 const addLevelReadingContent = async (_req, _res, next) => {
+    var _a, _b;
     try {
         const levelId = (0, param_parser_1.getParamString)(_req.params.levelId);
-        const content = await lms_content_service_1.default.addReadingContent(levelId, _req.body);
+        const uploadFile = _req.file;
+        let attachmentUrlFromUpload;
+        if (uploadFile) {
+            const originalName = ((_a = uploadFile.originalname) === null || _a === void 0 ? void 0 : _a.toLowerCase()) || '';
+            const isPdfByExtension = originalName.endsWith('.pdf');
+            const isPdfMime = uploadFile.mimetype === 'application/pdf' ||
+                uploadFile.mimetype === 'application/x-pdf' ||
+                uploadFile.mimetype === 'application/octet-stream' ||
+                uploadFile.mimetype === '';
+            if (!isPdfMime || !isPdfByExtension) {
+                throw new http_exception_1.default(400, 'Only PDF files are allowed for LMS reading upload');
+            }
+            try {
+                const uploadResult = await (0, cloudinary_service_1.uploadToCloudinary)(uploadFile.buffer, `lms/levels/${levelId}/reading`, client_1.ContentType.PDF, uploadFile.originalname, undefined, { forceAttachment: false });
+                attachmentUrlFromUpload = uploadResult.secure_url;
+            }
+            catch (uploadError) {
+                const errorCode = uploadError === null || uploadError === void 0 ? void 0 : uploadError.code;
+                const errorMessage = ((_b = uploadError === null || uploadError === void 0 ? void 0 : uploadError.message) === null || _b === void 0 ? void 0 : _b.toLowerCase()) || 'cloudinary upload failed';
+                if (errorCode && ['EAI_AGAIN', 'ENOTFOUND', 'ECONNRESET', 'ETIMEDOUT'].includes(errorCode)) {
+                    throw new http_exception_1.default(503, 'Cloudinary upload failed due to network/DNS issue. Please retry in a moment.');
+                }
+                if (errorMessage.includes('api key') || errorMessage.includes('authorization')) {
+                    throw new http_exception_1.default(500, 'Cloudinary credentials are invalid or misconfigured on backend.');
+                }
+                throw new http_exception_1.default(500, `Cloudinary upload failed: ${(uploadError === null || uploadError === void 0 ? void 0 : uploadError.message) || 'Unknown error'}`);
+            }
+        }
+        const payload = {
+            ..._req.body,
+            attachmentUrl: attachmentUrlFromUpload || _req.body.attachmentUrl,
+        };
+        const content = await lms_content_service_1.default.addReadingContent(levelId, payload);
         logger_config_1.default.info(`LMS reading content created: ${content.id} for level ${levelId}`);
         _res.status(201).json({
             success: true,

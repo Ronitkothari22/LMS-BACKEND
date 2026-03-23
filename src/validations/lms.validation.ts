@@ -2,6 +2,21 @@ import { z } from 'zod';
 
 const uuidParam = z.string().uuid('Invalid ID format');
 const lmsVisibilitySchema = z.enum(['ALL', 'SESSION']);
+const coerceBoolean = z.preprocess(value => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true') return true;
+    if (normalized === 'false') return false;
+  }
+  return value;
+}, z.boolean());
+
+const coerceNonNegativeInt = z.preprocess(value => {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string' && value.trim() !== '') return Number(value);
+  return value;
+}, z.number().int().nonnegative());
 
 export const createTopicSchema = z.object({
   body: z
@@ -137,8 +152,8 @@ export const addLevelReadingContentSchema = z.object({
     description: z.string().optional(),
     attachmentUrl: z.string().url().optional(),
     externalUrl: z.string().url().optional(),
-    isRequired: z.boolean().optional(),
-    position: z.number().int().nonnegative(),
+    isRequired: coerceBoolean.optional(),
+    position: coerceNonNegativeInt,
   }),
 });
 

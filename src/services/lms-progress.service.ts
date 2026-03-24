@@ -130,20 +130,55 @@ class LmsProgressService {
       return topic;
     }
 
-    // Ensure level progress rows exist with sequential lock defaults.
-    for (let i = 0; i < levels.length; i += 1) {
-      const level = levels[i];
-      const shouldUnlock = i === 0;
-      await prisma.lmsUserLevelProgress.upsert({
-        where: { userId_levelId: { userId, levelId: level.id } },
-        update: {},
-        create: {
-          userId,
-          levelId: level.id,
-          status: shouldUnlock ? LmsProgressStatus.UNLOCKED : LmsProgressStatus.LOCKED,
-          unlockedAt: shouldUnlock ? new Date() : null,
-        },
-      });
+    // Ensure level progress rows exist and unlock sequentially based on completion chain.
+    const levelIds = levels.map(level => level.id);
+    const existingLevelProgressRows = levelIds.length
+      ? await prisma.lmsUserLevelProgress.findMany({
+          where: {
+            userId,
+            levelId: { in: levelIds },
+          },
+          select: {
+            levelId: true,
+            status: true,
+            completedAt: true,
+          },
+        })
+      : [];
+
+    const existingLevelProgressMap = new Map(
+      existingLevelProgressRows.map(progress => [progress.levelId, progress]),
+    );
+
+    // First level is unlockable by default; each next level unlocks when previous is completed.
+    let previousLevelCompleted = true;
+
+    for (const level of levels) {
+      const existingProgress = existingLevelProgressMap.get(level.id);
+      const shouldUnlock = previousLevelCompleted;
+      const isCompleted =
+        existingProgress?.status === LmsProgressStatus.COMPLETED || !!existingProgress?.completedAt;
+
+      if (!existingProgress) {
+        await prisma.lmsUserLevelProgress.create({
+          data: {
+            userId,
+            levelId: level.id,
+            status: shouldUnlock ? LmsProgressStatus.UNLOCKED : LmsProgressStatus.LOCKED,
+            unlockedAt: shouldUnlock ? new Date() : null,
+          },
+        });
+      } else if (shouldUnlock && existingProgress.status === LmsProgressStatus.LOCKED) {
+        await prisma.lmsUserLevelProgress.update({
+          where: { userId_levelId: { userId, levelId: level.id } },
+          data: {
+            status: LmsProgressStatus.UNLOCKED,
+            unlockedAt: new Date(),
+          },
+        });
+      }
+
+      previousLevelCompleted = isCompleted;
     }
 
     // Topic progress row bootstrap.

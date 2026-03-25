@@ -7,6 +7,7 @@ export interface CreateLmsTopicInput {
   slug?: string;
   visibility?: LmsVisibility;
   sessionId?: string;
+  sessionIds?: string[];
   isPublished?: boolean;
   position?: number;
   estimatedDurationMinutes?: number;
@@ -18,6 +19,7 @@ export interface UpdateLmsTopicInput {
   slug?: string;
   visibility?: LmsVisibility;
   sessionId?: string | null;
+  sessionIds?: string[] | null;
   isPublished?: boolean;
   isActive?: boolean;
   position?: number;

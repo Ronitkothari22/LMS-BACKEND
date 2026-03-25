@@ -5,6 +5,18 @@ import type { CreateLmsLevelInput, UpdateLmsLevelInput } from '../types/lms.type
 import { Prisma } from '@prisma/client';
 
 class LmsTopicService {
+  private normalizeSessionIds(
+    sessionId?: string | null,
+    sessionIds?: string[] | null,
+  ): string[] {
+    const merged = [
+      ...(sessionId ? [sessionId] : []),
+      ...((sessionIds || []).filter(Boolean) as string[]),
+    ];
+
+    return Array.from(new Set(merged));
+  }
+
   private sanitizeLevelRules<T extends CreateLmsLevelInput | UpdateLmsLevelInput>(input: T): T {
     if (input.requireVideoCompletion && (input.minVideoWatchPercent ?? 0) <= 0) {
       return {
@@ -19,31 +31,46 @@ class LmsTopicService {
   private async resolveVisibilityInput(
     visibility?: 'ALL' | 'SESSION',
     sessionId?: string | null,
-  ): Promise<{ visibility?: 'ALL' | 'SESSION'; sessionId?: string | null }> {
+    sessionIds?: string[] | null,
+    options?: { includeSessionIds?: boolean },
+  ): Promise<{ visibility?: 'ALL' | 'SESSION'; sessionId?: string | null; sessionIds?: string[] }> {
+    const includeSessionIds = options?.includeSessionIds ?? false;
+
     if (visibility === 'ALL') {
-      return { visibility, sessionId: null };
+      return includeSessionIds
+        ? { visibility, sessionId: null, sessionIds: [] }
+        : { visibility, sessionId: null };
     }
 
-    if (visibility === 'SESSION' || (typeof visibility === 'undefined' && !!sessionId)) {
-      const targetSessionId = sessionId ?? null;
-      if (!targetSessionId) {
-        throw new HttpException(400, 'sessionId is required when visibility is SESSION');
+    const targetSessionIds = this.normalizeSessionIds(sessionId, sessionIds);
+
+    if (visibility === 'SESSION' || (typeof visibility === 'undefined' && targetSessionIds.length > 0)) {
+      if (targetSessionIds.length === 0) {
+        throw new HttpException(400, 'sessionId or sessionIds is required when visibility is SESSION');
       }
 
-      const session = await prisma.session.findUnique({
-        where: { id: targetSessionId },
+      const sessions = await prisma.session.findMany({
+        where: { id: { in: targetSessionIds } },
         select: { id: true },
       });
 
-      if (!session) {
-        throw new HttpException(400, 'Assigned session not found');
+      if (sessions.length !== targetSessionIds.length) {
+        throw new HttpException(400, 'One or more assigned sessions were not found');
       }
 
-      return { visibility: visibility || 'SESSION', sessionId: targetSessionId };
+      return {
+        visibility: visibility || 'SESSION',
+        sessionId: targetSessionIds[0] || null,
+        ...(includeSessionIds ? { sessionIds: targetSessionIds } : {}),
+      };
     }
 
     if (sessionId === null) {
-      return { sessionId: null };
+      return includeSessionIds ? { sessionId: null, sessionIds: [] } : { sessionId: null };
+    }
+
+    if (includeSessionIds && sessionIds === null) {
+      return { sessionIds: [] };
     }
 
     return {};
@@ -168,13 +195,35 @@ class LmsTopicService {
   }
 
   async createTopic(input: CreateLmsTopicInput, createdById: string) {
-    const resolvedVisibility = await this.resolveVisibilityInput(input.visibility, input.sessionId);
+    const resolvedVisibility = await this.resolveVisibilityInput(
+      input.visibility,
+      input.sessionId,
+      input.sessionIds,
+      { includeSessionIds: true },
+    );
+    const { sessionIds: resolvedSessionIds, ...resolvedTopicVisibility } = resolvedVisibility;
 
     return prisma.lmsTopic.create({
       data: {
-        ...input,
-        ...resolvedVisibility,
+        title: input.title,
+        description: input.description,
+        slug: input.slug,
+        visibility: input.visibility,
+        isPublished: input.isPublished,
+        position: input.position,
+        estimatedDurationMinutes: input.estimatedDurationMinutes,
+        ...resolvedTopicVisibility,
         createdById,
+        ...(typeof resolvedSessionIds !== 'undefined'
+          ? {
+              sessionAssignments: {
+                createMany: {
+                  data: resolvedSessionIds.map(sessionId => ({ sessionId })),
+                  skipDuplicates: true,
+                },
+              },
+            }
+          : {}),
       },
       include: {
         createdBy: {
@@ -187,6 +236,17 @@ class LmsTopicService {
         _count: {
           select: {
             levels: true,
+          },
+        },
+        sessionAssignments: {
+          include: {
+            session: {
+              select: {
+                id: true,
+                title: true,
+                isActive: true,
+              },
+            },
           },
         },
       },
@@ -210,6 +270,17 @@ class LmsTopicService {
         _count: {
           select: {
             levels: true,
+          },
+        },
+        sessionAssignments: {
+          include: {
+            session: {
+              select: {
+                id: true,
+                title: true,
+                isActive: true,
+              },
+            },
           },
         },
       },
@@ -263,6 +334,17 @@ class LmsTopicService {
             levels: true,
           },
         },
+        sessionAssignments: {
+          include: {
+            session: {
+              select: {
+                id: true,
+                title: true,
+                isActive: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -276,22 +358,63 @@ class LmsTopicService {
   async updateTopic(topicId: string, input: UpdateLmsTopicInput) {
     const existingTopic = await prisma.lmsTopic.findUnique({
       where: { id: topicId },
-      select: { id: true, visibility: true, sessionId: true },
+      select: {
+        id: true,
+        visibility: true,
+        sessionId: true,
+        sessionAssignments: {
+          select: { sessionId: true },
+        },
+      },
     });
     if (!existingTopic) {
       throw new HttpException(404, 'LMS topic not found');
     }
 
+    const existingSessionIds = this.normalizeSessionIds(
+      existingTopic.sessionId,
+      existingTopic.sessionAssignments.map(assignment => assignment.sessionId),
+    );
     const nextVisibility = input.visibility ?? existingTopic.visibility;
     const nextSessionId =
       typeof input.sessionId !== 'undefined' ? input.sessionId : existingTopic.sessionId;
-    const resolvedVisibility = await this.resolveVisibilityInput(nextVisibility, nextSessionId);
+    const nextSessionIds =
+      typeof input.sessionIds !== 'undefined' ? input.sessionIds : existingSessionIds;
+    const resolvedVisibility = await this.resolveVisibilityInput(
+      nextVisibility,
+      nextSessionId,
+      nextSessionIds,
+      { includeSessionIds: true },
+    );
+    const { sessionIds: resolvedSessionIds, ...resolvedTopicVisibility } = resolvedVisibility;
 
     return prisma.lmsTopic.update({
       where: { id: topicId },
       data: {
-        ...input,
-        ...resolvedVisibility,
+        title: input.title,
+        description: input.description,
+        slug: input.slug,
+        visibility: input.visibility,
+        isPublished: input.isPublished,
+        isActive: input.isActive,
+        position: input.position,
+        estimatedDurationMinutes: input.estimatedDurationMinutes,
+        ...resolvedTopicVisibility,
+        ...(typeof resolvedSessionIds !== 'undefined'
+          ? {
+              sessionAssignments: {
+                deleteMany: {},
+                ...(resolvedSessionIds.length
+                  ? {
+                      createMany: {
+                        data: resolvedSessionIds.map(sessionId => ({ sessionId })),
+                        skipDuplicates: true,
+                      },
+                    }
+                  : {}),
+              },
+            }
+          : {}),
       },
       include: {
         createdBy: {
@@ -304,6 +427,17 @@ class LmsTopicService {
         _count: {
           select: {
             levels: true,
+          },
+        },
+        sessionAssignments: {
+          include: {
+            session: {
+              select: {
+                id: true,
+                title: true,
+                isActive: true,
+              },
+            },
           },
         },
       },
@@ -323,7 +457,7 @@ class LmsTopicService {
   async createLevel(topicId: string, input: CreateLmsLevelInput) {
     await this.ensureTopicExists(topicId);
     const sanitizedInput = this.sanitizeLevelRules(input);
-    const resolvedVisibility = await this.resolveVisibilityInput(
+    const resolvedLevelVisibility = await this.resolveVisibilityInput(
       sanitizedInput.visibility,
       sanitizedInput.sessionId,
     );
@@ -336,7 +470,7 @@ class LmsTopicService {
           data: {
             topicId,
             ...sanitizedInput,
-            ...resolvedVisibility,
+            ...resolvedLevelVisibility,
           },
           include: {
             _count: {
@@ -368,7 +502,7 @@ class LmsTopicService {
       typeof sanitizedInput.sessionId !== 'undefined'
         ? sanitizedInput.sessionId
         : existingLevel?.sessionId;
-    const resolvedVisibility = await this.resolveVisibilityInput(nextVisibility, nextSessionId);
+    const resolvedLevelVisibility = await this.resolveVisibilityInput(nextVisibility, nextSessionId);
 
     try {
       return await prisma.$transaction(async tx => {
@@ -385,7 +519,7 @@ class LmsTopicService {
           where: { id: levelId },
           data: {
             ...sanitizedInput,
-            ...resolvedVisibility,
+            ...resolvedLevelVisibility,
           },
           include: {
             _count: {
@@ -436,6 +570,17 @@ class LmsTopicService {
         _count: {
           select: {
             levels: true,
+          },
+        },
+        sessionAssignments: {
+          include: {
+            session: {
+              select: {
+                id: true,
+                title: true,
+                isActive: true,
+              },
+            },
           },
         },
       },

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 const uuidParam = z.string().uuid('Invalid ID format');
+const uuidArray = z.array(uuidParam).min(1).max(100);
 const lmsVisibilitySchema = z.enum(['ALL', 'SESSION']);
 const coerceBoolean = z.preprocess(value => {
   if (typeof value === 'boolean') return value;
@@ -26,16 +27,20 @@ export const createTopicSchema = z.object({
       slug: z.string().min(2).optional(),
       visibility: lmsVisibilitySchema.optional(),
       sessionId: uuidParam.optional(),
+      sessionIds: uuidArray.optional(),
       isPublished: z.boolean().optional(),
       position: z.number().int().nonnegative().optional(),
       estimatedDurationMinutes: z.number().int().positive().optional(),
     })
     .superRefine((body, ctx) => {
-      if (body.visibility === 'SESSION' && !body.sessionId) {
+      const hasSessionId = !!body.sessionId;
+      const hasSessionIds = Array.isArray(body.sessionIds) && body.sessionIds.length > 0;
+
+      if (body.visibility === 'SESSION' && !hasSessionId && !hasSessionIds) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ['sessionId'],
-          message: 'sessionId is required when visibility is SESSION',
+          path: ['sessionIds'],
+          message: 'sessionId or sessionIds is required when visibility is SESSION',
         });
       }
     }),
@@ -64,6 +69,7 @@ export const updateTopicSchema = z.object({
     slug: z.string().min(2).optional(),
     visibility: lmsVisibilitySchema.optional(),
     sessionId: z.union([uuidParam, z.null()]).optional(),
+    sessionIds: z.union([uuidArray, z.null()]).optional(),
     isPublished: z.boolean().optional(),
     isActive: z.boolean().optional(),
     position: z.number().int().nonnegative().optional(),
@@ -91,7 +97,8 @@ export const createLevelSchema = z.object({
       xpOnCompletion: z.number().int().nonnegative().optional(),
     })
     .superRefine((body, ctx) => {
-      if (body.visibility === 'SESSION' && !body.sessionId) {
+      const hasSessionId = !!body.sessionId;
+      if (body.visibility === 'SESSION' && !hasSessionId) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['sessionId'],

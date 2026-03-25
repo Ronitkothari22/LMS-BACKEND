@@ -15,11 +15,26 @@ class LmsProgressService {
         { visibility: 'ALL' },
         {
           visibility: 'SESSION',
-          session: {
-            participants: {
-              some: { id: userId },
+          OR: [
+            {
+              session: {
+                participants: {
+                  some: { id: userId },
+                },
+              },
             },
-          },
+            {
+              sessionAssignments: {
+                some: {
+                  session: {
+                    participants: {
+                      some: { id: userId },
+                    },
+                  },
+                },
+              },
+            },
+          ],
         },
       ],
     };

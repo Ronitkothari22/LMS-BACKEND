@@ -96,6 +96,7 @@ model Session {
   surveys         Survey[]                 @relation("SessionSurveys") // Session surveys
   organizations   Organization[]           @relation("SessionOrganizations") // Session organizations
   lmsTopics       LmsTopic[]
+  lmsTopicAssignments LmsTopicSession[]
   lmsLevels       LmsLevel[]
   createdAt       DateTime                 @default(now())
   updatedAt       DateTime                 @updatedAt
@@ -675,6 +676,7 @@ model LmsTopic {
   visibility               LmsVisibility            @default(ALL)
   session                  Session?                 @relation(fields: [sessionId], references: [id], onDelete: SetNull)
   sessionId                String?
+  sessionAssignments       LmsTopicSession[]        @relation("LmsTopicSessionAssignments")
   isPublished              Boolean                  @default(false)
   isActive                 Boolean                  @default(true)
   position                 Int?
@@ -692,6 +694,18 @@ model LmsTopic {
 
   @@index([createdById, createdAt])
   @@index([visibility, sessionId])
+}
+
+model LmsTopicSession {
+  id        String   @id @default(uuid())
+  topic     LmsTopic @relation("LmsTopicSessionAssignments", fields: [topicId], references: [id], onDelete: Cascade)
+  topicId   String
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+  createdAt DateTime @default(now())
+
+  @@unique([topicId, sessionId])
+  @@index([sessionId, createdAt])
 }
 
 model LmsLevel {

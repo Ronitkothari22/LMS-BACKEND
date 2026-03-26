@@ -50,6 +50,9 @@ model User {
   lmsVideoWatchEvents      LmsVideoWatchEvent[]       @relation("LmsUserVideoWatchEvents")
   lmsXpLedgerEntries       LmsXpLedger[]              @relation("LmsUserXpLedger")
   lmsBadges                LmsUserBadge[]             @relation("LmsUserBadges")
+  sessionAssignmentsCreated SessionAssignment[]       @relation("SessionAssignmentsCreatedBy")
+  sessionAssignmentSubmissions SessionAssignmentSubmission[] @relation("SessionAssignmentSubmissionsByUser")
+  sessionAssignmentTimelineEvents SessionAssignmentTimelineEvent[] @relation("SessionAssignmentTimelineActor")
   createdAt            DateTime                 @default(now())
   updatedAt            DateTime                 @updatedAt
   xpPoints             Int                      @default(0) // Experience points
@@ -95,6 +98,8 @@ model Session {
   feedbacks       Feedback[]               @relation("SessionFeedbacks") // Session feedbacks
   surveys         Survey[]                 @relation("SessionSurveys") // Session surveys
   organizations   Organization[]           @relation("SessionOrganizations") // Session organizations
+  assignments     SessionAssignment[]      @relation("SessionAssignments")
+  assignmentSubmissions SessionAssignmentSubmission[] @relation("SessionAssignmentSubmissions")
   lmsTopics       LmsTopic[]
   lmsTopicAssignments LmsTopicSession[]
   lmsLevels       LmsLevel[]
@@ -392,6 +397,81 @@ model FeedbackResponse {
   @@unique([feedbackId, questionId, userId]) // One response per user per question
 }
 
+model SessionAssignment {
+  id                  String                            @id @default(uuid())
+  session             Session                           @relation("SessionAssignments", fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId           String
+  title               String
+  description         String?
+  instructions        String?
+  dueDate             DateTime
+  allowLateSubmission Boolean                           @default(false)
+  maxFileSizeMb       Int?                              @default(10)
+  maxFilesPerSubmission Int                             @default(5)
+  allowedFileTypes    String[]                          @default(["pdf", "doc", "docx"])
+  isActive            Boolean                           @default(true)
+  createdBy           User                              @relation("SessionAssignmentsCreatedBy", fields: [createdById], references: [id])
+  createdById         String
+  submissions         SessionAssignmentSubmission[]     @relation("SessionAssignmentSubmissions")
+  timelineEvents      SessionAssignmentTimelineEvent[]  @relation("SessionAssignmentTimeline")
+  createdAt           DateTime                          @default(now())
+  updatedAt           DateTime                          @updatedAt
+
+  @@index([sessionId, dueDate])
+  @@index([createdById])
+}
+
+model SessionAssignmentSubmission {
+  id          String                            @id @default(uuid())
+  assignment  SessionAssignment                 @relation("SessionAssignmentSubmissions", fields: [assignmentId], references: [id], onDelete: Cascade)
+  assignmentId String
+  session     Session                           @relation("SessionAssignmentSubmissions", fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId   String
+  user        User                              @relation("SessionAssignmentSubmissionsByUser", fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  files       SessionAssignmentSubmissionFile[] @relation("SessionAssignmentSubmissionFiles")
+  submittedAt DateTime                          @default(now())
+  isLate      Boolean                           @default(false)
+  version     Int                               @default(1)
+  status      SubmissionStatus                  @default(SUBMITTED)
+  timelineEvents SessionAssignmentTimelineEvent[] @relation("SessionAssignmentSubmissionTimeline")
+  createdAt   DateTime                          @default(now())
+  updatedAt   DateTime                          @updatedAt
+
+  @@unique([assignmentId, userId])
+  @@index([sessionId, assignmentId])
+  @@index([userId, submittedAt])
+}
+
+model SessionAssignmentSubmissionFile {
+  id            String                      @id @default(uuid())
+  submission    SessionAssignmentSubmission @relation("SessionAssignmentSubmissionFiles", fields: [submissionId], references: [id], onDelete: Cascade)
+  submissionId  String
+  fileUrl       String
+  fileName      String
+  fileMimeType  String
+  fileSizeBytes Int
+  createdAt     DateTime                    @default(now())
+
+  @@index([submissionId, createdAt])
+}
+
+model SessionAssignmentTimelineEvent {
+  id          String                      @id @default(uuid())
+  assignment  SessionAssignment           @relation("SessionAssignmentTimeline", fields: [assignmentId], references: [id], onDelete: Cascade)
+  assignmentId String
+  submission  SessionAssignmentSubmission? @relation("SessionAssignmentSubmissionTimeline", fields: [submissionId], references: [id], onDelete: SetNull)
+  submissionId String?
+  actorUser   User                        @relation("SessionAssignmentTimelineActor", fields: [actorUserId], references: [id], onDelete: Cascade)
+  actorUserId String
+  eventType   AssignmentTimelineEventType
+  eventMeta   Json?
+  createdAt   DateTime                    @default(now())
+
+  @@index([assignmentId, createdAt])
+  @@index([submissionId, createdAt])
+}
+
 enum FeedbackType {
   SMILEY_SCALE // 5-point smiley scale (default)
   TEXT // Open text response
@@ -596,6 +676,22 @@ enum CompletionStatus {
   INCOMPLETE
   COMPLETE
   PARTIAL
+}
+
+enum SubmissionStatus {
+  SUBMITTED
+  REPLACED
+  WITHDRAWN
+}
+
+enum AssignmentTimelineEventType {
+  ASSIGNMENT_CREATED
+  ASSIGNMENT_UPDATED
+  LATE_SUBMISSION_ENABLED
+  LATE_SUBMISSION_DISABLED
+  SUBMISSION_UPLOADED
+  SUBMISSION_REPLACED
+  SUBMISSION_DOWNLOADED
 }
 
 // ==========================================

@@ -253,7 +253,11 @@ class LmsAnalyticsService {
       .sort((a, b) => a.user.name.localeCompare(b.user.name))
       .map(user => ({
         ...user,
-        levels: user.levels.map(({ updatedAt: _updatedAt, ...level }) => level),
+        levels: user.levels.map(level => {
+          const { updatedAt, ...rest } = level;
+          void updatedAt;
+          return rest;
+        }),
       }));
 
     const assignedSessionsFromTopic = (topic.sessionAssignments || [])

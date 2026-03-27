@@ -226,11 +226,11 @@ Each event stores actor, timestamp, and contextual metadata in `eventMeta`.
 Status:
 - Phase 0: Completed (Updated)
 - Phase 1: Completed (Updated)
-- Phase 2: Pending
-- Phase 3: Pending
-- Phase 4: Pending
-- Phase 5: Pending
-- Phase 6: Pending
+- Phase 2: Completed
+- Phase 3: Completed
+- Phase 4: Completed
+- Phase 5: Completed
+- Phase 6: Completed (Execution Pending in Current Environment)
 - Phase 7: Pending
 
 ## Phase 0: Finalized Functional Contract (Locked)
@@ -308,6 +308,21 @@ Completion Note:
 Deliverable:
 - Validation coverage for all new routes.
 
+Completion Note:
+- Completed on March 27, 2026.
+- Added assignment validation schemas in `src/validations/session.validation.ts` for:
+  - Admin assignment create/update/get/delete/list
+  - Admin submissions list filter
+  - Admin timeline endpoint
+  - Admin file download params (`submissionId`, `fileId`)
+  - Participant assignment list/detail
+  - Participant submission create/get
+- Added guard validations for:
+  - Allowed file type list values (`pdf`, `doc`, `docx`)
+  - `maxFileSizeMb` upper bound
+  - `maxFilesPerSubmission` upper bound
+  - Pagination coercion and positive integer checks
+
 ## Phase 3: Service Layer (Backend)
 
 - Create `session-assignment.service.ts` with:
@@ -320,6 +335,17 @@ Deliverable:
 Deliverable:
 - Service methods with typed return DTOs.
 
+Completion Note:
+- Completed on March 27, 2026.
+- Added `src/services/session-assignment.service.ts` with:
+  - assignment CRUD methods
+  - participant submission logic with replace/version behavior
+  - deadline and late-submission gate checks
+  - admin submission listing + summary counts + filters
+  - timeline event writing for all key actions
+  - participant access checks and manager access checks
+  - download file lookup with audit event
+
 ## Phase 4: Controllers + Routes (Backend)
 
 - Add controller file(s) for admin and participant flows.
@@ -329,6 +355,15 @@ Deliverable:
 Deliverable:
 - Working REST endpoints with consistent response envelope.
 
+Completion Note:
+- Completed on March 27, 2026.
+- Added `src/controllers/session-assignment.controller.ts`.
+- Wired routes in `src/routes/session.routes.ts` for:
+  - Admin/session-creator assignment management
+  - Admin submission/timeline/download endpoints
+  - Participant assignment list/detail/submission endpoints
+- All routes use `authenticateToken`, `validateRequest`, and appropriate upload middleware.
+
 ## Phase 5: Storage Integration (Backend)
 
 - Reuse existing file upload strategy (Cloudinary/MinIO patterns already in project).
@@ -337,6 +372,13 @@ Deliverable:
 
 Deliverable:
 - End-to-end upload + download from API.
+
+Completion Note:
+- Completed on March 27, 2026.
+- Added assignment upload middleware (`assignmentSubmissionUpload`) with PDF/DOC/DOCX filtering.
+- Implemented Cloudinary upload flow for each submitted file.
+- Stored per-file metadata into `SessionAssignmentSubmissionFile`.
+- Implemented download metadata endpoint that returns file URL + metadata after permission checks.
 
 ## Phase 6: Testing (Backend)
 
@@ -352,6 +394,14 @@ Deliverable:
 
 Deliverable:
 - Passing test suite for assignment module critical paths.
+
+Completion Note:
+- Completed on March 27, 2026 (test coverage added).
+- Added unit tests in `src/tests/session-assignment.service.test.ts` for:
+  - deadline-closed rejection
+  - replaceExisting guard
+  - multi-file submission success path
+- In this environment, executing Jest is currently blocked because `jest` binary is not installed locally and network-restricted `npx` cannot fetch it.
 
 ## Phase 7: Admin/UI + User/UI (Next Step, After Backend)
 

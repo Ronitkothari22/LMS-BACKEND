@@ -93,6 +93,31 @@ const quizImageFileFilter = (
   }
 };
 
+// File filter for assignment submissions (PDF/DOC/DOCX only)
+const assignmentSubmissionFileFilter = (
+  _req: any,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback,
+) => {
+  const originalName = file.originalname?.toLowerCase() || '';
+  const ext = originalName.split('.').pop() || '';
+  const allowedExt = ['pdf', 'doc', 'docx'];
+
+  const validMime =
+    file.mimetype === 'application/pdf' ||
+    file.mimetype === 'application/x-pdf' ||
+    file.mimetype === 'application/msword' ||
+    file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    file.mimetype === 'application/octet-stream';
+
+  if (!allowedExt.includes(ext) || !validMime) {
+    cb(new HttpException(400, 'Only PDF, DOC, and DOCX files are allowed for assignments'));
+    return;
+  }
+
+  cb(null, true);
+};
+
 // Create multer instance for CSV uploads
 export const upload = multer({
   storage,
@@ -138,5 +163,16 @@ export const quizWithImagesUpload = multer({
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit per image
     files: 20, // Maximum 20 images
+  },
+});
+
+// Create multer instance for assignment submission uploads
+export const assignmentSubmissionUpload = multer({
+  storage,
+  fileFilter: assignmentSubmissionFileFilter,
+  limits: {
+    fileSize: 20 * 1024 * 1024, // Route-level hard guard. Assignment-specific limit is validated in service.
+    files: 20, // Route-level hard guard. Assignment-specific max count is validated in service.
+    fieldSize: 2 * 1024 * 1024,
   },
 });

@@ -101,6 +101,20 @@ class SessionAssignmentService {
     return allowLateSubmission ? ('LATE_ALLOWED' as const) : ('CLOSED' as const);
   }
 
+  private getCanSubmit(
+    assignment: Pick<
+      {
+        dueDate: Date;
+        allowLateSubmission: boolean;
+        isActive: boolean;
+      },
+      'dueDate' | 'allowLateSubmission' | 'isActive'
+    >,
+  ) {
+    if (!assignment.isActive) return false;
+    return this.getDeadlineStatus(assignment.dueDate, assignment.allowLateSubmission) !== 'CLOSED';
+  }
+
   private getPagination(page?: number, limit?: number) {
     const safePage = page && page > 0 ? page : 1;
     const safeLimit = limit && limit > 0 ? Math.min(limit, 100) : 10;
@@ -281,8 +295,7 @@ class SessionAssignmentService {
     return {
       ...assignment,
       deadlineStatus: this.getDeadlineStatus(assignment.dueDate, assignment.allowLateSubmission),
-      canSubmit:
-        this.getDeadlineStatus(assignment.dueDate, assignment.allowLateSubmission) !== 'CLOSED',
+      canSubmit: this.getCanSubmit(assignment),
     };
   }
 
@@ -312,8 +325,7 @@ class SessionAssignmentService {
       ...assignment,
       submissionsCount: assignment._count?.submissions ?? 0,
       deadlineStatus: this.getDeadlineStatus(assignment.dueDate, assignment.allowLateSubmission),
-      canSubmit:
-        this.getDeadlineStatus(assignment.dueDate, assignment.allowLateSubmission) !== 'CLOSED',
+      canSubmit: this.getCanSubmit(assignment),
     }));
 
     return {
@@ -346,8 +358,7 @@ class SessionAssignmentService {
       submissionsCount: assignment._count?.submissions ?? 0,
       timelineEventsCount: assignment._count?.timelineEvents ?? 0,
       deadlineStatus: this.getDeadlineStatus(assignment.dueDate, assignment.allowLateSubmission),
-      canSubmit:
-        this.getDeadlineStatus(assignment.dueDate, assignment.allowLateSubmission) !== 'CLOSED',
+      canSubmit: this.getCanSubmit(assignment),
     };
   }
 
@@ -411,8 +422,7 @@ class SessionAssignmentService {
     return {
       ...updated,
       deadlineStatus: this.getDeadlineStatus(updated.dueDate, updated.allowLateSubmission),
-      canSubmit:
-        this.getDeadlineStatus(updated.dueDate, updated.allowLateSubmission) !== 'CLOSED',
+      canSubmit: this.getCanSubmit(updated),
     };
   }
 
@@ -643,7 +653,6 @@ class SessionAssignmentService {
 
     const where: any = {
       sessionId,
-      isActive: true,
       ...(query.upcomingOnly ? { dueDate: { gte: now } } : {}),
     };
 
@@ -669,8 +678,7 @@ class SessionAssignmentService {
         ...assignment,
         mySubmission,
         deadlineStatus: this.getDeadlineStatus(assignment.dueDate, assignment.allowLateSubmission),
-        canSubmit:
-          this.getDeadlineStatus(assignment.dueDate, assignment.allowLateSubmission) !== 'CLOSED',
+        canSubmit: this.getCanSubmit(assignment),
       };
     });
 
@@ -691,7 +699,6 @@ class SessionAssignmentService {
       where: {
         id: assignmentId,
         sessionId,
-        isActive: true,
       },
       include: {
         submissions: {
@@ -714,8 +721,7 @@ class SessionAssignmentService {
       ...assignment,
       mySubmission,
       deadlineStatus: this.getDeadlineStatus(assignment.dueDate, assignment.allowLateSubmission),
-      canSubmit:
-        this.getDeadlineStatus(assignment.dueDate, assignment.allowLateSubmission) !== 'CLOSED',
+      canSubmit: this.getCanSubmit(assignment),
     };
   }
 
@@ -754,7 +760,6 @@ class SessionAssignmentService {
       where: {
         id: assignmentId,
         sessionId,
-        isActive: true,
       },
       include: {
         submissions: {
@@ -766,6 +771,10 @@ class SessionAssignmentService {
 
     if (!assignment) {
       throw new HttpException(404, 'Assignment not found');
+    }
+
+    if (!assignment.isActive) {
+      throw new HttpException(400, 'Assignment is inactive and cannot accept submissions');
     }
 
     const deadlineStatus = this.getDeadlineStatus(assignment.dueDate, assignment.allowLateSubmission);
